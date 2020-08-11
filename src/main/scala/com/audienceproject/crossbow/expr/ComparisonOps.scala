@@ -18,20 +18,20 @@ private object ComparisonOps {
 
   case class GreaterThan(lhs: Expr, rhs: Expr) extends BinaryExpr(lhs, rhs) {
     override def typeSpec(lhsOperand: Specialized[_], rhsOperand: Specialized[_]): Specialized[_] =
-      (lhsOperand.getType, rhsOperand.getType) match {
+      (lhsOperand.typeOf, rhsOperand.typeOf) match {
         // Long
-        case ("long", "long") => specialize[Long, Long, Boolean](lhsOperand, rhsOperand, _ > _)
-        case ("long", "int") => specialize[Long, Int, Boolean](lhsOperand, rhsOperand, _ > _)
-        case ("long", "double") => specialize[Long, Double, Boolean](lhsOperand, rhsOperand, _ > _)
+        case (LongType, LongType) => specialize[Long, Long, Boolean](lhsOperand, rhsOperand, _ > _)
+        case (LongType, IntType) => specialize[Long, Int, Boolean](lhsOperand, rhsOperand, _ > _)
+        case (LongType, DoubleType) => specialize[Long, Double, Boolean](lhsOperand, rhsOperand, _ > _)
         // Int
-        case ("int", "long") => specialize[Int, Long, Boolean](lhsOperand, rhsOperand, _ > _)
-        case ("int", "int") => specialize[Int, Int, Boolean](lhsOperand, rhsOperand, _ > _)
-        case ("int", "double") => specialize[Int, Double, Boolean](lhsOperand, rhsOperand, _ > _)
+        case (IntType, LongType) => specialize[Int, Long, Boolean](lhsOperand, rhsOperand, _ > _)
+        case (IntType, IntType) => specialize[Int, Int, Boolean](lhsOperand, rhsOperand, _ > _)
+        case (IntType, DoubleType) => specialize[Int, Double, Boolean](lhsOperand, rhsOperand, _ > _)
         // Double
-        case ("double", "long") => specialize[Double, Long, Boolean](lhsOperand, rhsOperand, _ > _)
-        case ("double", "int") => specialize[Double, Int, Boolean](lhsOperand, rhsOperand, _ > _)
-        case ("double", "double") => specialize[Double, Double, Boolean](lhsOperand, rhsOperand, _ > _)
-        case _ => throw new InvalidExpressionException("GreaterThan", lhsOperand.getType, rhsOperand.getType)
+        case (DoubleType, LongType) => specialize[Double, Long, Boolean](lhsOperand, rhsOperand, _ > _)
+        case (DoubleType, IntType) => specialize[Double, Int, Boolean](lhsOperand, rhsOperand, _ > _)
+        case (DoubleType, DoubleType) => specialize[Double, Double, Boolean](lhsOperand, rhsOperand, _ > _)
+        case _ => throw new InvalidExpressionException("GreaterThan", lhsOperand.typeOf, rhsOperand.typeOf)
       }
   }
 

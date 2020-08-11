@@ -16,23 +16,23 @@ private object BooleanOps {
 
   case class Not(expr: Expr) extends UnaryExpr(expr) {
     override def typeSpec(operand: Specialized[_]): Specialized[Boolean] =
-      if (operand.getType == "boolean") specialize[Boolean, Boolean](operand, !_)
-      else throw new InvalidExpressionException("Not", operand.getType)
+      if (operand.typeOf =:= BooleanType) specialize[Boolean, Boolean](operand, !_)
+      else throw new InvalidExpressionException("Not", operand.typeOf)
   }
 
   case class And(lhs: Expr, rhs: Expr) extends BinaryExpr(lhs, rhs) {
     override def typeSpec(lhsOperand: Specialized[_], rhsOperand: Specialized[_]): Specialized[Boolean] =
-      (lhsOperand.getType, rhsOperand.getType) match {
-        case ("boolean", "boolean") => specialize[Boolean, Boolean, Boolean](lhsOperand, rhsOperand, _ && _)
-        case _ => throw new InvalidExpressionException("And", lhsOperand.getType, rhsOperand.getType)
+      (lhsOperand.typeOf, rhsOperand.typeOf) match {
+        case (BooleanType, BooleanType) => specialize[Boolean, Boolean, Boolean](lhsOperand, rhsOperand, _ && _)
+        case _ => throw new InvalidExpressionException("And", lhsOperand.typeOf, rhsOperand.typeOf)
       }
   }
 
   case class Or(lhs: Expr, rhs: Expr) extends BinaryExpr(lhs, rhs) {
     override def typeSpec(lhsOperand: Specialized[_], rhsOperand: Specialized[_]): Specialized[Boolean] =
-      (lhsOperand.getType, rhsOperand.getType) match {
-        case ("boolean", "boolean") => specialize[Boolean, Boolean, Boolean](lhsOperand, rhsOperand, _ || _)
-        case _ => throw new InvalidExpressionException("Or", lhsOperand.getType, rhsOperand.getType)
+      (lhsOperand.typeOf, rhsOperand.typeOf) match {
+        case (BooleanType, BooleanType) => specialize[Boolean, Boolean, Boolean](lhsOperand, rhsOperand, _ || _)
+        case _ => throw new InvalidExpressionException("Or", lhsOperand.typeOf, rhsOperand.typeOf)
       }
   }
 

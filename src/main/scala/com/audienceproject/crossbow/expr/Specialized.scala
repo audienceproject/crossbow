@@ -1,13 +1,11 @@
 package com.audienceproject.crossbow.expr
 
-import scala.reflect.{ClassTag, classTag}
-
-private[crossbow] abstract class Specialized[@specialized(Int, Long, Double) T: ClassTag] {
+private[crossbow] abstract class Specialized[@specialized(Int, Long, Double) T](implicit t: ru.TypeTag[T]) {
 
   def apply(i: Int): T
 
   def as[A]: Specialized[A] = this.asInstanceOf[Specialized[A]]
 
-  def getType: String = classTag[T].getClass.getSimpleName
+  val typeOf: ru.Type = ru.typeOf[T]
 
 }
