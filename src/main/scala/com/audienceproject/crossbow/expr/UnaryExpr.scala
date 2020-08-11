@@ -1,12 +1,20 @@
 package com.audienceproject.crossbow.expr
 
+import com.audienceproject.crossbow.DataFrame
+
 import scala.reflect.ClassTag
 
 protected abstract class UnaryExpr(expr: Expr) extends Expr {
 
-  protected val operand: Specialized[_] = expr.compile()
+  override private[crossbow] def compile(context: DataFrame) = {
+    val operand = expr.compile(context)
+    typeSpec(operand)
+  }
 
-  protected def specialize[T, U: ClassTag](op: T => U): Specialized[U] = UnaryExpr.UnaryOp[T, U](operand.as, op)
+  def typeSpec(operand: Specialized[_]): Specialized[_]
+
+  def specialize[T, U: ClassTag](operand: Specialized[_], op: T => U): Specialized[U] =
+    UnaryExpr.UnaryOp[T, U](operand.as, op)
 
 }
 

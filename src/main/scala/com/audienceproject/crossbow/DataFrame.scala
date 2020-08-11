@@ -1,22 +1,26 @@
 package com.audienceproject.crossbow
 
-import com.audienceproject.crossbow.Implicits._
 import com.audienceproject.crossbow.expr.Expr
-import org.apache.arrow.memory.RootAllocator
-import org.apache.arrow.vector.{FieldVector, IntVector}
 
-class DataFrame(private val columns: Seq[FieldVector] = Seq.empty) {
+import scala.reflect.ClassTag
 
-  private val allocator = new RootAllocator()
+class DataFrame(private val columns: List[Array[_]]) {
+
+  private val schema = columns.indices.map(i => s"_$i")
+
+  def getColumn[T: ClassTag](index: Int): IndexedSeq[T] = {
+    // TODO: Typecheck.
+    columns(index).asInstanceOf[Array[T]]
+  }
+
+  def getColumn[T](columnName: String): IndexedSeq[T] = getColumn(schema.indexWhere(_ == columnName))
 
   def filter(expr: Expr): DataFrame = {
-    val op = expr.compile().as[Boolean]
+    val op = expr.compile(this).as[Boolean]
     this
   }
 
-  override def finalize(): Unit = {
-    super.finalize()
-    columns.foreach(_.close())
+  class View[T] {
   }
 
 }
@@ -24,16 +28,19 @@ class DataFrame(private val columns: Seq[FieldVector] = Seq.empty) {
 object DataFrame {
 
   def main(args: Array[String]): Unit = {
-    val df = fromSeq(Seq(1, 2, 3))
-    df.filter($"int vector" + $"long vector" > 3)
+    val df = fromSeq(Seq(("a", 1), ("b", 2), ("c", 3)))
   }
 
-  def fromSeq(seq: Seq[Int]): DataFrame = {
-    val col = new IntVector("int vector", new RootAllocator())
-    col.allocateNew(seq.size)
-    seq.zipWithIndex.foreach({ case (x, i) => col.set(i, x) })
-    col.setValueCount(seq.size)
-    new DataFrame(Seq(col))
+  def fromSeq[T <: Product](data: Seq[T]): DataFrame = {
+    if (data.isEmpty) new DataFrame(List.empty)
+    else {
+      val first = data.head
+      val columns = List.fill(first.productArity)(Array.newBuilder[Any])
+      for (d <- data)
+        for (i <- 0 until d.productArity)
+          columns(i) += d.productElement(i)
+      new DataFrame(columns.map(_.result()))
+    }
   }
 
 }

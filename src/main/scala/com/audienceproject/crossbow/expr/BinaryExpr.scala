@@ -1,13 +1,21 @@
 package com.audienceproject.crossbow.expr
 
+import com.audienceproject.crossbow.DataFrame
+
 import scala.reflect.ClassTag
 
 protected abstract class BinaryExpr(lhs: Expr, rhs: Expr) extends Expr {
 
-  protected val lhsOperand: Specialized[_] = lhs.compile()
-  protected val rhsOperand: Specialized[_] = rhs.compile()
+  override private[crossbow] def compile(context: DataFrame) = {
+    val lhsOperand = lhs.compile(context)
+    val rhsOperand = rhs.compile(context)
+    typeSpec(lhsOperand, rhsOperand)
+  }
 
-  protected def specialize[T, U, V: ClassTag](op: (T, U) => V): Specialized[V] =
+  def typeSpec(lhsOperand: Specialized[_], rhsOperand: Specialized[_]): Specialized[_]
+
+  def specialize[T, U, V: ClassTag](lhsOperand: Specialized[_], rhsOperand: Specialized[_],
+                                    op: (T, U) => V): Specialized[V] =
     BinaryExpr.BinaryOp[T, U, V](lhsOperand.as, rhsOperand.as, op)
 
 }

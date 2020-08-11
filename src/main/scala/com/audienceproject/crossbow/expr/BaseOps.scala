@@ -13,7 +13,8 @@ trait BaseOps {
 private object BaseOps {
 
   case class EqualTo(lhs: Expr, rhs: Expr) extends BinaryExpr(lhs, rhs) {
-    override def compile(): Specialized[_] = specialize[Any, Any, Any](_ == _)
+    override def typeSpec(lhsOperand: Specialized[_], rhsOperand: Specialized[_]): Specialized[_] =
+      specialize[Any, Any, Any](lhsOperand, rhsOperand, _ == _)
   }
 
 }

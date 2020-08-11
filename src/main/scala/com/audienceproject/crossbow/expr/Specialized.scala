@@ -2,7 +2,7 @@ package com.audienceproject.crossbow.expr
 
 import scala.reflect.{ClassTag, classTag}
 
-abstract class Specialized[T: ClassTag] {
+private[crossbow] abstract class Specialized[T: ClassTag] {
 
   def apply(i: Int): T
 
