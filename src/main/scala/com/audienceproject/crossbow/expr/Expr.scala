@@ -11,10 +11,13 @@ abstract class Expr extends BaseOps with ArithmeticOps with BooleanOps with Comp
 private[crossbow] object Expr {
 
   case class Column(columnName: String) extends Expr {
+    // TODO: Check schema first for type specialization.
     override private[crossbow] def compile(context: DataFrame) = new Specialized[Any] {
-      private val column = context.getColumn[Any](columnName)
+      private val column = context.getColumn(columnName)
 
       override def apply(i: Int): Any = column(i)
+
+      override def getType: String = "" // TODO: Check schema for type.
     }
   }
 
