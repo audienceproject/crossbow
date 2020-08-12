@@ -8,13 +8,15 @@ trait BaseOps {
 
   def =!=(other: Expr): Expr = BaseOps.EqualTo(this, other).not()
 
+  def as(name: String): Expr = Expr.Named(name, this)
+
 }
 
 private object BaseOps {
 
   case class EqualTo(lhs: Expr, rhs: Expr) extends BinaryExpr(lhs, rhs) {
     override def typeSpec(lhsOperand: Specialized[_], rhsOperand: Specialized[_]): Specialized[_] =
-      specialize[Any, Any, Any](lhsOperand, rhsOperand, _ == _)
+      specialize[Any, Any, Boolean](lhsOperand, rhsOperand, _ == _)
   }
 
 }
