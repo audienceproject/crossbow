@@ -1,5 +1,7 @@
 package com.audienceproject.crossbow.expr
 
+import com.audienceproject.crossbow.exceptions.InvalidExpressionException
+
 trait BooleanOps {
 
   self: Expr =>

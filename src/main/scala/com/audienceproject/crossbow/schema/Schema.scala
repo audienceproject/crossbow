@@ -8,7 +8,11 @@ case class Schema(columns: List[Column] = List.empty) {
     throw new NoSuchElementException(s"Schema does not contain a column with name '$columnName''")
   )
 
-  def indexOf(columnName: String): Int = columns.indexWhere(_.name == columnName)
+  def indexOf(columnName: String): Int = {
+    val index = columns.indexWhere(_.name == columnName)
+    if (index >= 0) index
+    else throw new NoSuchElementException(s"Schema does not contain a column with name '$columnName''")
+  }
 
   override def toString: String = columns.map(_.toString).mkString("\n")
 

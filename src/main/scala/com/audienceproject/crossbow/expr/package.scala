@@ -2,7 +2,7 @@ package com.audienceproject.crossbow
 
 package object expr {
 
-  val ru: scala.reflect.runtime.universe.type = scala.reflect.runtime.universe
+  private[crossbow] val ru = scala.reflect.runtime.universe
 
   val IntType: ru.Type = ru.typeOf[Int]
   val LongType: ru.Type = ru.typeOf[Long]

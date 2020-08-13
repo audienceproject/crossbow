@@ -1,6 +1,6 @@
 package com.audienceproject.crossbow.schema
 
-import scala.reflect.runtime.{universe => ru}
+import com.audienceproject.crossbow.expr.ru
 
 class Column private[crossbow](val name: String, private val columnType: ru.Type) {
 

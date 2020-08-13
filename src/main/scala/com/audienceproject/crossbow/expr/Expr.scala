@@ -53,10 +53,9 @@ private[crossbow] object Expr {
     }
   }
 
-  case class Lambda[T, R](expr: Expr, f: T => R)(implicit t: ru.TypeTag[R]) extends Expr {
+  case class Lambda[T, R](expr: Expr, f: T => R)(implicit t: ru.TypeTag[T], r: ru.TypeTag[R]) extends Expr {
     override private[crossbow] def compile(context: DataFrame) = {
-      // TODO: Typecheck.
-      val spec = expr.compile(context).as[T]
+      val spec = expr.compile(context).typecheckAs[T]
       new Specialized[R] {
         override def apply(i: Int): R = f(spec(i))
       }
