@@ -4,7 +4,9 @@ import com.audienceproject.crossbow.exceptions.IncorrectTypeException
 import com.audienceproject.crossbow.expr.{Expr, Specialized, ru}
 import com.audienceproject.crossbow.schema.{Column, Schema}
 
+import scala.collection.immutable.ArraySeq
 import scala.reflect.ClassTag
+import scala.util.Sorting
 
 class DataFrame private(private val columnData: List[Array[_]],
                         val schema: Schema) extends Iterable[Seq[Any]] {
@@ -66,6 +68,13 @@ class DataFrame private(private val columnData: List[Array[_]],
     slice(indices)
   }
 
+  def sortBy[T](expr: Expr, ord: Ordering[T])(implicit t: ru.TypeTag[T]): DataFrame = {
+    val op = expr.compile(this).typecheckAs[T]
+    val indices = Array.tabulate(rowCount)(identity)
+    Sorting.quickSort[Int](indices)((x: Int, y: Int) => ord.compare(op(x), op(y)))
+    slice(ArraySeq.unsafeWrapArray(indices))
+  }
+
   def renameColumns(newNames: String*): DataFrame = {
     if (newNames.size != numColumns) throw new IllegalArgumentException("Wrong number of column names given.")
     val columnSchemas = schema.columns.zip(newNames).map({ case (col, name) => col.renamed(name) })
@@ -99,7 +108,7 @@ class DataFrame private(private val columnData: List[Array[_]],
 
   private def fillArray[T: ClassTag](indices: Seq[Int], getValue: Int => T): Array[T] = {
     val arr = new Array[T](indices.size)
-    for (i <- indices) arr(i) = getValue(i)
+    for (i <- arr.indices) arr(i) = getValue(indices(i))
     arr
   }
 
