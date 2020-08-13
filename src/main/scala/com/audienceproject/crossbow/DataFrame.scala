@@ -1,7 +1,7 @@
 package com.audienceproject.crossbow
 
 import com.audienceproject.crossbow.exceptions.IncorrectTypeException
-import com.audienceproject.crossbow.expr.{Expr, Specialized, ru}
+import com.audienceproject.crossbow.expr.{Expr, Order, Specialized, ru}
 import com.audienceproject.crossbow.schema.{Column, Schema}
 
 import scala.collection.immutable.ArraySeq
@@ -68,8 +68,9 @@ class DataFrame private(private val columnData: List[Array[_]],
     slice(indices)
   }
 
-  def sortBy[T](expr: Expr, ord: Ordering[T])(implicit t: ru.TypeTag[T]): DataFrame = {
-    val op = expr.compile(this).typecheckAs[T]
+  def sortBy(expr: Expr, givenOrderings: Order*): DataFrame = {
+    val op = expr.compile(this)
+    val ord = Order.getOrdering(op.typeOf, givenOrderings)
     val indices = Array.tabulate(rowCount)(identity)
     Sorting.quickSort[Int](indices)((x: Int, y: Int) => ord.compare(op(x), op(y)))
     slice(ArraySeq.unsafeWrapArray(indices))
