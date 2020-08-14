@@ -7,7 +7,7 @@ private[crossbow] object Types {
     case LongType if ru.definitions.LongTpe weak_<:< runtimeType => true
     case DoubleType if ru.definitions.DoubleTpe weak_<:< runtimeType => true
     case BooleanType if ru.definitions.BooleanTpe weak_<:< runtimeType => true
-    case AnyType(runtimeType) if runtimeType <:< runtimeType => true
+    case AnyType(anyType) if anyType <:< runtimeType => true
     case ProductType(elementTypes@_*) if runtimeType <:< ru.typeOf[Product] =>
       val innerTypes = runtimeType.typeArgs
       if (elementTypes.length == innerTypes.length)
