@@ -1,7 +1,7 @@
 package com.audienceproject.crossbow
 
 import com.audienceproject.crossbow.exceptions.IncorrectTypeException
-import com.audienceproject.crossbow.expr.{Expr, Order, Specialized, ru}
+import com.audienceproject.crossbow.expr._
 import com.audienceproject.crossbow.schema.{Column, Schema}
 
 import scala.collection.immutable.ArraySeq
@@ -23,26 +23,21 @@ class DataFrame private(private val columnData: List[Array[_]],
     select(colExprs: _*)
   }
 
-  def as[T](implicit t: ru.TypeTag[T]): TypedView[T] = {
+  def as[T: ru.TypeTag]: TypedView[T] = {
     val dataType = ru.typeOf[T]
-    if (dataType <:< ru.typeOf[Product]) {
-      val tupleTypes = dataType.typeArgs
-      if (schema.columns.size != tupleTypes.size)
-        throw new IncorrectTypeException("")
-      if (!schema.columns.zip(tupleTypes).forall({ case (col, t) => col.getTypeInternal <:< t }))
-        throw new IncorrectTypeException(s"")
-    } else if (numColumns > 1 || !schema.columns.head.conformsTo[T]) {
-      throw new IncorrectTypeException(s"")
-    }
-    new TypedView[T]
+    val schemaType =
+      if (numColumns == 1) schema.columns.head.columnType
+      else ProductType(schema.columns.map(_.columnType): _*)
+    if (Types.typecheck(schemaType, dataType)) new TypedView[T]
+    else throw new IncorrectTypeException(dataType, schemaType)
   }
 
   def addColumn(expr: Expr): DataFrame = {
     val op = expr.compile(this)
     val newCol = sliceColumn(op)
     val newColSchema = expr match {
-      case Expr.Named(columnName, _) => new Column(columnName, op.typeOf)
-      case _ => new Column(s"_$numColumns", op.typeOf)
+      case Expr.Named(columnName, _) => Column(columnName, op.typeOf)
+      case _ => Column(s"_$numColumns", op.typeOf)
     }
     new DataFrame(newCol :: columnData, schema.add(newColSchema))
   }
@@ -99,10 +94,10 @@ class DataFrame private(private val columnData: List[Array[_]],
 
   private def sliceColumn(op: Specialized[_], indices: Seq[Int] = 0 until rowCount): Array[_] = {
     op.typeOf match {
-      case t if t <:< ru.typeOf[Int] => fillArray[Int](indices, op.as[Int].apply)
-      case t if t <:< ru.typeOf[Long] => fillArray[Long](indices, op.as[Long].apply)
-      case t if t <:< ru.typeOf[Double] => fillArray[Double](indices, op.as[Double].apply)
-      case t if t <:< ru.typeOf[Boolean] => fillArray[Boolean](indices, op.as[Boolean].apply)
+      case IntType => fillArray[Int](indices, op.as[Int].apply)
+      case LongType => fillArray[Long](indices, op.as[Long].apply)
+      case DoubleType => fillArray[Double](indices, op.as[Double].apply)
+      case BooleanType => fillArray[Boolean](indices, op.as[Boolean].apply)
       case _ => fillArray[Any](indices, op.apply)
     }
   }
@@ -134,29 +129,29 @@ class DataFrame private(private val columnData: List[Array[_]],
 
 object DataFrame {
 
-  def fromSeq[T](data: Seq[T])(implicit t: ru.TypeTag[T]): DataFrame = {
+  def fromSeq[T: ru.TypeTag](data: Seq[T]): DataFrame = {
     if (data.isEmpty) new DataFrame(List.empty, Schema())
     else {
-      val dataType = ru.typeOf[T]
-      if (dataType <:< ru.typeOf[Product]) {
-        val tupleData = data.asInstanceOf[Seq[Product]]
-        val tupleTypes = dataType.typeArgs
-        val columnData = tupleTypes.zipWithIndex.map({ case (t, i) => convert(tupleData.map(_.productElement(i)), t) })
-        val columnSchemas = tupleTypes.zipWithIndex.map({ case (elementType, i) => new Column(s"_$i", elementType) })
-        new DataFrame(columnData, Schema(columnSchemas))
-      } else {
-        val col = convert(data, dataType)
-        new DataFrame(List(col), Schema(List(new Column("_0", dataType))))
+      val dataType = Types.toInternalType(ru.typeOf[T])
+      dataType match {
+        case ProductType(elementTypes@_*) =>
+          val tupleData = data.asInstanceOf[Seq[Product]]
+          val columnData = elementTypes.zipWithIndex.map({ case (t, i) => convert(tupleData.map(_.productElement(i)), t) })
+          val columnSchemas = elementTypes.zipWithIndex.map({ case (t, i) => Column(s"_$i", t) })
+          new DataFrame(columnData.toList, Schema(columnSchemas.toList))
+        case _ =>
+          val col = convert(data, dataType)
+          new DataFrame(List(col), Schema(List(new Column("_0", dataType))))
       }
     }
   }
 
-  private def convert(data: Seq[Any], dataType: ru.Type): Array[_] = {
+  private def convert(data: Seq[Any], dataType: Type): Array[_] = {
     dataType match {
-      case t if t =:= ru.typeOf[Int] => data.asInstanceOf[Seq[Int]].toArray
-      case t if t =:= ru.typeOf[Long] => data.asInstanceOf[Seq[Long]].toArray
-      case t if t =:= ru.typeOf[Double] => data.asInstanceOf[Seq[Double]].toArray
-      case t if t =:= ru.typeOf[Boolean] => data.asInstanceOf[Seq[Boolean]].toArray
+      case IntType => data.asInstanceOf[Seq[Int]].toArray
+      case LongType => data.asInstanceOf[Seq[Long]].toArray
+      case DoubleType => data.asInstanceOf[Seq[Double]].toArray
+      case BooleanType => data.asInstanceOf[Seq[Boolean]].toArray
       case _ => data.toArray
     }
   }

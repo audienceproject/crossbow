@@ -1,10 +1,6 @@
 package com.audienceproject.crossbow.exceptions
 
-import com.audienceproject.crossbow.expr.ru
+import com.audienceproject.crossbow.expr.{Type, ru}
 
-class IncorrectTypeException(message: String) extends RuntimeException(message) {
-
-  def this(expected: ru.Type, actual: ru.Type) =
-    this(s"Expected $expected, but Expr type was $actual")
-
-}
+class IncorrectTypeException(expected: ru.Type, actual: Type)
+  extends RuntimeException(s"Expected $expected, but Expr type was $actual")

@@ -1,23 +1,10 @@
 package com.audienceproject.crossbow.schema
 
-import com.audienceproject.crossbow.expr.ru
+import com.audienceproject.crossbow.expr.{Type, Types, ru}
 
-class Column private[crossbow](val name: String, private val columnType: ru.Type) {
+case class Column private[crossbow](name: String, columnType: Type) {
 
-  def isOf[T](implicit t: ru.TypeTag[T]): Boolean = columnType =:= ru.typeOf[T]
-
-  def conformsTo[T](implicit t: ru.TypeTag[T]): Boolean = columnType <:< ru.typeOf[T]
-
-  def renamed(newName: String): Column = new Column(newName, columnType)
-
-  private[crossbow] def getTypeInternal: ru.Type = columnType
-
-  override def equals(obj: Any): Boolean = obj match {
-    case other: Column => this.name == other.name && this.columnType =:= other.columnType
-    case _ => false
-  }
-
-  override def hashCode(): Int = name.hashCode + columnType.hashCode() * 13
+  def renamed(newName: String): Column = Column(newName, columnType)
 
   override def toString: String = s"$name: $columnType"
 
@@ -25,6 +12,7 @@ class Column private[crossbow](val name: String, private val columnType: ru.Type
 
 object Column {
 
-  def of[T](columnName: String)(implicit t: ru.TypeTag[T]): Column = new Column(columnName, ru.typeOf[T])
+  def apply[T: ru.TypeTag](columnName: String): Column =
+    Column(columnName, Types.toInternalType(ru.typeOf[T]))
 
 }

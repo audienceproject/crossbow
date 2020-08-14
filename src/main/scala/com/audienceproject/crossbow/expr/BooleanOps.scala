@@ -18,7 +18,7 @@ private object BooleanOps {
 
   case class Not(expr: Expr) extends UnaryExpr(expr) {
     override def typeSpec(operand: Specialized[_]): Specialized[Boolean] =
-      if (operand.typeOf =:= BooleanType) specialize[Boolean, Boolean](operand, !_)
+      if (operand.typeOf == BooleanType) specialize[Boolean, Boolean](operand, !_)
       else throw new InvalidExpressionException("Not", operand.typeOf)
   }
 
