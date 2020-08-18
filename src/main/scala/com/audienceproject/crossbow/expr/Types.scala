@@ -14,8 +14,8 @@ private[crossbow] object Types {
         elementTypes.zip(innerTypes).forall({ case (e, r) => typecheck(e, r) })
       else false
     case ListType(elementType) if runtimeType <:< ru.typeOf[Seq[_]] =>
-      typecheck(elementType, runtimeType)
-    case _ => false
+      typecheck(elementType, runtimeType.typeArgs.head)
+    case _ => runtimeType =:= ru.typeOf[Any]
   }
 
   def toInternalType(runtimeType: ru.Type): Type = runtimeType match {

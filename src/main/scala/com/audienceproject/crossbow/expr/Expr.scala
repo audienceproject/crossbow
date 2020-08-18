@@ -3,7 +3,9 @@ package com.audienceproject.crossbow.expr
 import com.audienceproject.crossbow.DataFrame
 import com.audienceproject.crossbow.exceptions.InvalidExpressionException
 
-abstract class Expr extends BaseOps with ArithmeticOps with BooleanOps with ComparisonOps {
+abstract class Expr extends BaseOps
+  with ArithmeticOps with BooleanOps with ComparisonOps
+  with AggregationOps {
   private[crossbow] def compile(context: DataFrame): Specialized[_]
 }
 

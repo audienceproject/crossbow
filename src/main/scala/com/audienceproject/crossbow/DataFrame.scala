@@ -1,5 +1,6 @@
 package com.audienceproject.crossbow
 
+import com.audienceproject.crossbow.algorithms.GroupBy
 import com.audienceproject.crossbow.exceptions.IncorrectTypeException
 import com.audienceproject.crossbow.expr._
 import com.audienceproject.crossbow.schema.{Column, Schema}
@@ -61,6 +62,11 @@ class DataFrame private(private val columnData: List[Array[_]],
     val op = expr.compile(this).typecheckAs[Boolean]
     val indices = for (i <- 0 until rowCount if op(i)) yield i
     slice(indices)
+  }
+
+  def groupBy(expr: Expr, aggregators: Aggregator*): DataFrame = {
+    val (newCols, newSchema) = GroupBy(this, expr, aggregators)
+    new DataFrame(newCols, newSchema)
   }
 
   def sortBy(expr: Expr, givenOrderings: Order*): DataFrame = {
