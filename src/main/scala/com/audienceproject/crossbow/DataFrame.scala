@@ -43,6 +43,8 @@ class DataFrame private(private val columnData: List[Array[_]],
     new DataFrame(newCol :: columnData, schema.add(newColSchema))
   }
 
+  def removeColumns(columnNames: String*): DataFrame = ???
+
   def select(exprs: Expr*): DataFrame = {
     val (colData, colSchemas) = exprs.zipWithIndex.map({
       case (Expr.Named(newName, Expr.Column(colName)), _) => (getColumnData(colName), schema.get(colName).renamed(newName))
@@ -64,10 +66,7 @@ class DataFrame private(private val columnData: List[Array[_]],
     slice(indices)
   }
 
-  def groupBy(expr: Expr, aggregators: Aggregator*): DataFrame = {
-    val (newCols, newSchema) = GroupBy(this, expr, aggregators)
-    new DataFrame(newCols, newSchema)
-  }
+  def groupBy(expr: Expr): GroupedView = new GroupedView(expr)
 
   def sortBy(expr: Expr, givenOrderings: Order*): DataFrame = {
     val op = expr.compile(this)
@@ -76,6 +75,8 @@ class DataFrame private(private val columnData: List[Array[_]],
     Sorting.quickSort[Int](indices)((x: Int, y: Int) => ord.compare(op(x), op(y)))
     slice(ArraySeq.unsafeWrapArray(indices))
   }
+
+  def union(other: DataFrame): DataFrame = ???
 
   def renameColumns(newNames: String*): DataFrame = {
     if (newNames.size != numColumns) throw new IllegalArgumentException("Wrong number of column names given.")
@@ -119,7 +120,14 @@ class DataFrame private(private val columnData: List[Array[_]],
     columnData(columnIndex)
   }
 
-  class TypedView[T] extends Iterable[T] {
+  class GroupedView private[DataFrame](expr: Expr) {
+    def agg(aggExprs: Aggregator*): DataFrame = {
+      val (newCols, newSchema) = GroupBy(DataFrame.this, expr, aggExprs)
+      new DataFrame(newCols, newSchema)
+    }
+  }
+
+  class TypedView[T] private[DataFrame]() extends Iterable[T] {
     private implicit val t2Tuple: Seq[Any] => T = toTuple[T](numColumns)
 
     def apply(index: Int): T = DataFrame.this (index)

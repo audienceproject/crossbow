@@ -18,10 +18,10 @@ protected abstract class BinaryExpr(lhs: Expr, rhs: Expr) extends Expr {
 
 }
 
-private object BinaryExpr {
+private[crossbow] object BinaryExpr {
 
-  private[BinaryExpr] case class BinaryOp[T, U, V: ru.TypeTag](lhs: Specialized[T], rhs: Specialized[U],
-                                                               op: (T, U) => V)
+  case class BinaryOp[T, U, V: ru.TypeTag](lhs: Specialized[T], rhs: Specialized[U],
+                                           op: (T, U) => V)
     extends Specialized[V] {
     override def apply(i: Int): V = op(lhs(i), rhs(i))
   }

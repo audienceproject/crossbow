@@ -16,9 +16,9 @@ protected abstract class UnaryExpr(expr: Expr) extends Expr {
 
 }
 
-private object UnaryExpr {
+private[crossbow] object UnaryExpr {
 
-  private[UnaryExpr] case class UnaryOp[T, U: ru.TypeTag](operand: Specialized[T], op: T => U)
+  case class UnaryOp[T, U: ru.TypeTag](operand: Specialized[T], op: T => U)
     extends Specialized[U] {
     override def apply(i: Int): U = op(operand(i))
   }

@@ -10,7 +10,8 @@ private[crossbow] object GroupBy {
 
   def apply(dataFrame: DataFrame, expr: Expr, aggregators: Seq[Aggregator]): (List[Array[Any]], Schema) = {
     val keyEval = expr.compile(dataFrame)
-    val reducers = aggregators.toList.map(_.compile(dataFrame))
+    val reducers = aggregators.toList.map(_.reduceOn(dataFrame))
+
     val groups = mutable.HashMap.empty[Any, List[Any]].withDefaultValue(reducers.map(_.seed))
     for (i <- 0 until dataFrame.rowCount) {
       val key = keyEval(i)
