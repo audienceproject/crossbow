@@ -66,7 +66,7 @@ class DataFrame private(private val columnData: List[Array[_]],
     slice(indices)
   }
 
-  def groupBy(expr: Expr): GroupedView = new GroupedView(expr)
+  def groupBy(keyExprs: Expr*): GroupedView = new GroupedView(keyExprs)
 
   def sortBy(expr: Expr, givenOrderings: Order*): DataFrame = {
     val op = expr.compile(this)
@@ -120,8 +120,8 @@ class DataFrame private(private val columnData: List[Array[_]],
     columnData(columnIndex)
   }
 
-  class GroupedView private[DataFrame](expr: Expr) {
-    def agg(aggExprs: Expr*): DataFrame = GroupBy(DataFrame.this, expr, aggExprs)
+  class GroupedView private[DataFrame](keyExprs: Seq[Expr]) {
+    def agg(aggExprs: Expr*): DataFrame = GroupBy(DataFrame.this, keyExprs, aggExprs)
   }
 
   class TypedView[T] private[DataFrame]() extends Iterable[T] {

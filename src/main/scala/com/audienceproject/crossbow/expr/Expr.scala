@@ -34,6 +34,8 @@ private[crossbow] object Expr {
           specializeWithType[Any](columnData, columnType)
       }
     }
+
+    override def toString: String = columnName
   }
 
   case class Literal[T: ru.TypeTag](value: T) extends Expr {

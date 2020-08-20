@@ -1,27 +1,18 @@
 package com.audienceproject.crossbow.expr
 
 import com.audienceproject.crossbow.DataFrame
-import com.audienceproject.crossbow.exceptions.InvalidExpressionException
+import com.audienceproject.crossbow.exceptions.{AggregationException, InvalidExpressionException}
 import com.audienceproject.crossbow.expr.Aggregator.Reducer
 
 /**
  * Aggregators are also Exprs. If evaluated as an Aggregator with reduceOn, it can be used by the GroupBy algorithm.
- * If compiled directly as an Expr, it evaluates to the reduction applied exactly once to the inner Expr and the seed.
+ * If compiled directly as an Expr, it will throw an AggregationException to indicate unintended use.
  *
  * @param expr the inner Expr
  */
 abstract class Aggregator(expr: Expr) extends Expr {
 
-  override private[crossbow] def compile(context: DataFrame) = {
-    // TODO: Consider throwing an exception instead of accepting Aggregators in a non-reducing context.
-    val op = expr.compile(context)
-    val reducer = reduceOn(context)
-    new Specialized[Any] {
-      override def apply(i: Int): Any = reducer.f(op(i), reducer.seed)
-
-      override val typeOf: Type = reducer.typeOf
-    }
-  }
+  override private[crossbow] def compile(context: DataFrame) = throw new AggregationException(this)
 
   private[crossbow] def reduceOn(context: DataFrame): Reducer[Any, Any] = {
     val op = expr.compile(context)
