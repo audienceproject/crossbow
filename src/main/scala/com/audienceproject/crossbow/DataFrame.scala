@@ -121,10 +121,7 @@ class DataFrame private(private val columnData: List[Array[_]],
   }
 
   class GroupedView private[DataFrame](expr: Expr) {
-    def agg(aggExprs: Aggregator*): DataFrame = {
-      val (newCols, newSchema) = GroupBy(DataFrame.this, expr, aggExprs)
-      new DataFrame(newCols, newSchema)
-    }
+    def agg(aggExprs: Expr*): DataFrame = GroupBy(DataFrame.this, expr, aggExprs)
   }
 
   class TypedView[T] private[DataFrame]() extends Iterable[T] {
@@ -158,6 +155,11 @@ object DataFrame {
           new DataFrame(List(col), Schema(List(new Column("_0", dataType))))
       }
     }
+  }
+
+  def fromColumns(columns: List[Seq[Any]], schema: Schema): DataFrame = {
+    val columnData = columns.zip(schema.columns).map({ case (data, col) => convert(data, col.columnType) })
+    new DataFrame(columnData, schema)
   }
 
   private def convert(data: Seq[Any], dataType: Type): Array[_] = {

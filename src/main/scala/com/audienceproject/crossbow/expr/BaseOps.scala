@@ -12,7 +12,7 @@ trait BaseOps {
 
 }
 
-private object BaseOps {
+private[crossbow] object BaseOps {
 
   case class EqualTo(lhs: Expr, rhs: Expr) extends BinaryExpr(lhs, rhs) {
     override def typeSpec(lhsOperand: Specialized[_], rhsOperand: Specialized[_]): Specialized[_] =

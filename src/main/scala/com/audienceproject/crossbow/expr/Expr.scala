@@ -3,11 +3,8 @@ package com.audienceproject.crossbow.expr
 import com.audienceproject.crossbow.DataFrame
 import com.audienceproject.crossbow.exceptions.InvalidExpressionException
 
-abstract class Expr extends BaseOps
-  with ArithmeticOps with BooleanOps with ComparisonOps {
-
+abstract class Expr extends BaseOps with ArithmeticOps with BooleanOps with ComparisonOps {
   private[crossbow] def compile(context: DataFrame): Specialized[_]
-
 }
 
 private[crossbow] object Expr {
@@ -48,6 +45,8 @@ private[crossbow] object Expr {
       val spec = expr.compile(context).typecheckAs[T]
       specialize[R](i => f(spec(i)))
     }
+
+    def copy(newExpr: Expr): Lambda[T, R] = Lambda(newExpr, f)
   }
 
   case class Tuple(exprs: Expr*) extends Expr {

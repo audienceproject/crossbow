@@ -54,7 +54,7 @@ private[crossbow] object Aggregator {
 
   case class Collect(expr: Expr) extends Aggregator(expr) {
     override protected def typeSpec(op: Specialized[_]): Reducer[_, _] =
-      Reducer[Any, Seq[Any]](op, _ +: _, Seq.empty, ListType(op.typeOf))
+      Reducer[Any, Seq[Any]](op, (e, seq) => seq :+ e, Vector.empty, ListType(op.typeOf))
   }
 
   case class OneOf(expr: Expr) extends Aggregator(expr) {

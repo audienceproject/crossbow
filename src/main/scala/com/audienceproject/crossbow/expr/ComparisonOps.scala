@@ -16,7 +16,7 @@ trait ComparisonOps {
 
 }
 
-private object ComparisonOps {
+private[crossbow] object ComparisonOps {
 
   case class GreaterThan(lhs: Expr, rhs: Expr) extends BinaryExpr(lhs, rhs) {
     override def typeSpec(lhsOperand: Specialized[_], rhsOperand: Specialized[_]): Specialized[_] =

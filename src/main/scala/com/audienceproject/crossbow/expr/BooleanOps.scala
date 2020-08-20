@@ -14,7 +14,7 @@ trait BooleanOps {
 
 }
 
-private object BooleanOps {
+private[crossbow] object BooleanOps {
 
   case class Not(expr: Expr) extends UnaryExpr(expr) {
     override def typeSpec(operand: Specialized[_]): Specialized[Boolean] =

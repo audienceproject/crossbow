@@ -22,7 +22,7 @@ trait ArithmeticOps {
 
 }
 
-private object ArithmeticOps {
+private[crossbow] object ArithmeticOps {
 
   case class Plus(lhs: Expr, rhs: Expr) extends BinaryExpr(lhs, rhs) {
     override def typeSpec(lhsOperand: Specialized[_], rhsOperand: Specialized[_]): Specialized[_] =
