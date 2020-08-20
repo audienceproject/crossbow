@@ -43,7 +43,12 @@ class DataFrame private(private val columnData: List[Array[_]],
     new DataFrame(newCol :: columnData, schema.add(newColSchema))
   }
 
-  def removeColumns(columnNames: String*): DataFrame = ???
+  def removeColumns(columnNames: String*): DataFrame = {
+    val remaining = for ((c, i) <- schema.columns.zipWithIndex if !columnNames.contains(c.name))
+      yield (columnData(i), c)
+    val (colData, colSchemas) = remaining.unzip
+    new DataFrame(colData, Schema(colSchemas))
+  }
 
   def select(exprs: Expr*): DataFrame = {
     val (colData, colSchemas) = exprs.zipWithIndex.map({
