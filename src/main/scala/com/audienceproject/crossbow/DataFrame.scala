@@ -1,6 +1,6 @@
 package com.audienceproject.crossbow
 
-import com.audienceproject.crossbow.algorithms.GroupBy
+import com.audienceproject.crossbow.algorithms.{GroupBy, SortMergeJoin}
 import com.audienceproject.crossbow.exceptions.IncorrectTypeException
 import com.audienceproject.crossbow.expr._
 import com.audienceproject.crossbow.schema.{Column, Schema}
@@ -81,6 +81,9 @@ class DataFrame private(private val columnData: List[Array[_]],
     slice(ArraySeq.unsafeWrapArray(indices))
   }
 
+  def join(other: DataFrame, joinExpr: Expr, joinType: JoinType = JoinType.Inner): DataFrame =
+    SortMergeJoin(this, other, joinExpr, joinType)
+
   def union(other: DataFrame): DataFrame = ???
 
   def renameColumns(newNames: String*): DataFrame = {
@@ -96,7 +99,12 @@ class DataFrame private(private val columnData: List[Array[_]],
 
   def printSchema(): Unit = println(schema)
 
-  private def slice(indices: IndexedSeq[Int]): DataFrame = {
+  private[crossbow] def merge(other: DataFrame): DataFrame = {
+    // TODO: Deduplicate columns.
+    new DataFrame(columnData ++ other.columnData, Schema(schema.columns ++ other.schema.columns))
+  }
+
+  private[crossbow] def slice(indices: IndexedSeq[Int]): DataFrame = {
     val newData = schema.columns.map(col => {
       val op = Expr.Column(col.name).compile(this)
       sliceColumn(op, indices)
@@ -137,6 +145,8 @@ class DataFrame private(private val columnData: List[Array[_]],
     def apply(range: Range): Seq[T] = for (i <- range) yield this (i)
 
     override def iterator: Iterator[T] = this (0 until rowCount).iterator
+
+    override def knownSize: Int = rowCount
   }
 
   override def iterator: Iterator[Seq[Any]] = (for (i <- 0 until rowCount) yield this (i)).iterator

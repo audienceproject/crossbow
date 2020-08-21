@@ -8,7 +8,7 @@ object Order {
 
   def by[T: ru.TypeTag](ord: Ordering[T]): Order = new Order(ord, Types.toInternalType(ru.typeOf[T]))
 
-  private[crossbow] def getOrdering(internalType: Type, givens: Seq[Order]): Ordering[Any] = {
+  private[crossbow] def getOrdering(internalType: Type, givens: Seq[Order] = Seq.empty): Ordering[Any] = {
     givens.find(_.internalType == internalType) match {
       case Some(explicitOrdering) => explicitOrdering.ord.asInstanceOf[Ordering[Any]]
       case None =>

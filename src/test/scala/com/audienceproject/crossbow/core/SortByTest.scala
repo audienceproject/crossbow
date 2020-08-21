@@ -28,7 +28,7 @@ class SortByTest extends AnyFunSuite {
     assert(result == expected)
   }
 
-  case class Custom(x: Int)
+  private case class Custom(x: Int)
 
   test("sortBy with explicit ordering on custom type") {
     val makeCustom = lambda[Int, Custom](Custom)
