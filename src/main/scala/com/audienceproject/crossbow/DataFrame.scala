@@ -9,7 +9,7 @@ import scala.collection.immutable.ArraySeq
 import scala.reflect.ClassTag
 import scala.util.Sorting
 
-class DataFrame private(private val columnData: List[Array[_]],
+class DataFrame private(private val columnData: Vector[Array[_]],
                         val schema: Schema) extends Iterable[Seq[Any]] {
 
   val rowCount: Int = columnData.head.length
@@ -40,14 +40,14 @@ class DataFrame private(private val columnData: List[Array[_]],
       case Expr.Named(columnName, _) => Column(columnName, op.typeOf)
       case _ => Column(s"_$numColumns", op.typeOf)
     }
-    new DataFrame(newCol :: columnData, schema.add(newColSchema))
+    new DataFrame(columnData :+ newCol, schema.add(newColSchema))
   }
 
   def removeColumns(columnNames: String*): DataFrame = {
     val remaining = for ((c, i) <- schema.columns.zipWithIndex if !columnNames.contains(c.name))
       yield (columnData(i), c)
     val (colData, colSchemas) = remaining.unzip
-    new DataFrame(colData, Schema(colSchemas))
+    new DataFrame(colData.toVector, Schema(colSchemas))
   }
 
   def select(exprs: Expr*): DataFrame = {
@@ -62,7 +62,7 @@ class DataFrame private(private val columnData: List[Array[_]],
         }
         (sliceColumn(op), newColSchema)
     }).unzip
-    new DataFrame(colData.toList, Schema(colSchemas.toList))
+    new DataFrame(colData.toVector, Schema(colSchemas))
   }
 
   def filter(expr: Expr): DataFrame = {
@@ -84,7 +84,20 @@ class DataFrame private(private val columnData: List[Array[_]],
   def join(other: DataFrame, joinExpr: Expr, joinType: JoinType = JoinType.Inner): DataFrame =
     SortMergeJoin(this, other, joinExpr, joinType)
 
-  def union(other: DataFrame): DataFrame = ???
+  def union(other: DataFrame): DataFrame = {
+    if (schema == other.schema) {
+      val colData = for (i <- 0 until numColumns) yield columnData(i) ++ other.columnData(i)
+      new DataFrame(colData.toVector, schema)
+    } else {
+      val matchingColumns = schema.matchColumns(other.schema)
+      val colData = matchingColumns.map({
+        case (_, Left((i, j))) => columnData(i) ++ other.columnData(j)
+        case (c, Right(Left(i))) => columnData(i) ++ fillNullArray(other.rowCount, c.columnType)
+        case (c, Right(Right(j))) => fillNullArray(rowCount, c.columnType) ++ other.columnData(j)
+      })
+      new DataFrame(colData.toVector, Schema(matchingColumns.map(_._1)))
+    }
+  }
 
   def renameColumns(newNames: String*): DataFrame = {
     if (newNames.size != numColumns) throw new IllegalArgumentException("Wrong number of column names given.")
@@ -109,7 +122,7 @@ class DataFrame private(private val columnData: List[Array[_]],
       val op = Expr.Column(col.name).compile(this)
       sliceColumn(op, indices)
     })
-    new DataFrame(newData, schema)
+    new DataFrame(newData.toVector, schema)
   }
 
   private def sliceColumn(op: Specialized[_], indices: Seq[Int] = 0 until rowCount): Array[_] = {
@@ -128,6 +141,16 @@ class DataFrame private(private val columnData: List[Array[_]],
       if (indices(i) >= 0) arr(i) = getValue(indices(i))
       else arr(i) = getNull
     arr
+  }
+
+  private def fillNullArray(size: Int, ofType: Type): Array[_] = {
+    ofType match {
+      case IntType => Array.fill[Int](size)(0)
+      case LongType => Array.fill[Long](size)(0L)
+      case DoubleType => Array.fill[Double](size)(0d)
+      case BooleanType => Array.fill[Boolean](size)(false)
+      case _ => Array.fill[Any](size)(null)
+    }
   }
 
   private[crossbow] def getColumnData(columnName: String): Array[_] = {
@@ -158,7 +181,7 @@ class DataFrame private(private val columnData: List[Array[_]],
 object DataFrame {
 
   def fromSeq[T: ru.TypeTag](data: Seq[T]): DataFrame = {
-    if (data.isEmpty) new DataFrame(List.empty, Schema())
+    if (data.isEmpty) new DataFrame(Vector.empty, Schema())
     else {
       val dataType = Types.toInternalType(ru.typeOf[T])
       dataType match {
@@ -166,17 +189,17 @@ object DataFrame {
           val tupleData = data.asInstanceOf[Seq[Product]]
           val columnData = elementTypes.zipWithIndex.map({ case (t, i) => convert(tupleData.map(_.productElement(i)), t) })
           val columnSchemas = elementTypes.zipWithIndex.map({ case (t, i) => Column(s"_$i", t) })
-          new DataFrame(columnData.toList, Schema(columnSchemas.toList))
+          new DataFrame(columnData.toVector, Schema(columnSchemas.toList))
         case _ =>
           val col = convert(data, dataType)
-          new DataFrame(List(col), Schema(List(new Column("_0", dataType))))
+          new DataFrame(Vector(col), Schema(List(new Column("_0", dataType))))
       }
     }
   }
 
-  def fromColumns(columns: List[Seq[Any]], schema: Schema): DataFrame = {
+  def fromColumns(columns: IndexedSeq[Seq[Any]], schema: Schema): DataFrame = {
     val columnData = columns.zip(schema.columns).map({ case (data, col) => convert(data, col.columnType) })
-    new DataFrame(columnData, schema)
+    new DataFrame(columnData.toVector, schema)
   }
 
   private def convert(data: Seq[Any], dataType: Type): Array[_] = {

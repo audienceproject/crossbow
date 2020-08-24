@@ -29,8 +29,8 @@ private[crossbow] object GroupBy {
     }
 
     val (orderedKeys, orderedResult) = groups.toSeq.unzip
-    val newKeyCols = List.tabulate(keyExprs.size)(i => orderedKeys.map(_ (i)))
-    val newDataCols = List.tabulate(reducers.size)(i => orderedResult.map(_ (i)))
+    val newKeyCols = Vector.tabulate(keyExprs.size)(i => orderedKeys.map(_ (i)))
+    val newDataCols = Vector.tabulate(reducers.size)(i => orderedResult.map(_ (i)))
 
     val keyNames = keyExprs.zipWithIndex.map({
       case (Expr.Named(name, _), _) => name
