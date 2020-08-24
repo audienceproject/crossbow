@@ -2,7 +2,41 @@ package com.audienceproject.crossbow.algorithms
 
 import com.audienceproject.crossbow.expr._
 
+import scala.annotation.tailrec
+
 private[crossbow] object Traversal {
+
+  /**
+   * Collects the output of PartialFunction 'pf' for all nodes in the expression tree on which it is defined.
+   * Traverses the expression tree depth-first and applies 'pf' recursively on all children where 'pf' is undefined
+   * on the parent.
+   *
+   * @param expr root of the expression tree
+   * @param pf   function defined on the subset of Expr types which should be collected in the output
+   * @tparam T element type of output
+   * @return list of output
+   */
+  def collect[T](expr: Expr, pf: PartialFunction[Expr, T]): Seq[T] = {
+    @tailrec
+    def dfs(stack: List[Expr], result: List[T]): List[T] = stack match {
+      case head :: tail => pf.lift(head) match {
+        case Some(t) => dfs(tail, t :: result)
+        case None => head match {
+          case BinaryExpr(lhs, rhs) => dfs(lhs :: rhs :: tail, result)
+          case UnaryExpr(expr) => dfs(expr :: tail, result)
+          case Aggregator(expr) => dfs(expr :: tail, result)
+          case Expr.Named(name, expr) => dfs(expr :: tail, result)
+          case Expr.Tuple(exprs@_*) => dfs(exprs.toList ++ tail, result)
+          case Expr.List(exprs) => dfs(exprs.toList ++ tail, result)
+          case lambda: Expr.Lambda[_, _] => dfs(lambda.expr :: tail, result)
+          case _ => dfs(tail, result)
+        }
+      }
+      case _ => result
+    }
+
+    dfs(List(expr), List.empty)
+  }
 
   /**
    * Transforms the given expression tree, replacing all nodes on which PartialFunction 'pf' is defined with its output.

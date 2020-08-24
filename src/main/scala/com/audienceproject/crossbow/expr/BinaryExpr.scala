@@ -2,7 +2,7 @@ package com.audienceproject.crossbow.expr
 
 import com.audienceproject.crossbow.DataFrame
 
-protected abstract class BinaryExpr(lhs: Expr, rhs: Expr) extends Expr {
+protected abstract class BinaryExpr(private val lhs: Expr, private val rhs: Expr) extends Expr {
 
   override private[crossbow] def compile(context: DataFrame) = {
     val lhsOperand = lhs.compile(context)
@@ -25,5 +25,7 @@ private[crossbow] object BinaryExpr {
     extends Specialized[V] {
     override def apply(i: Int): V = op(lhs(i), rhs(i))
   }
+
+  def unapply(arg: BinaryExpr): Option[(Expr, Expr)] = Some((arg.lhs, arg.rhs))
 
 }

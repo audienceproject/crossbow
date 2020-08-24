@@ -2,7 +2,7 @@ package com.audienceproject.crossbow.expr
 
 import com.audienceproject.crossbow.DataFrame
 
-protected abstract class UnaryExpr(expr: Expr) extends Expr {
+protected abstract class UnaryExpr(private val expr: Expr) extends Expr {
 
   override private[crossbow] def compile(context: DataFrame) = {
     val operand = expr.compile(context)
@@ -22,5 +22,7 @@ private[crossbow] object UnaryExpr {
     extends Specialized[U] {
     override def apply(i: Int): U = op(operand(i))
   }
+
+  def unapply(arg: UnaryExpr): Option[Expr] = Some(arg.expr)
 
 }

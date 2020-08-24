@@ -10,7 +10,7 @@ import com.audienceproject.crossbow.expr.Aggregator.Reducer
  *
  * @param expr the inner Expr
  */
-abstract class Aggregator(expr: Expr) extends Expr {
+abstract class Aggregator(private val expr: Expr) extends Expr {
 
   override private[crossbow] def compile(context: DataFrame) = throw new AggregationException(this)
 
@@ -52,5 +52,7 @@ private[crossbow] object Aggregator {
     override protected def typeSpec(op: Specialized[_]): Reducer[_, _] =
       Reducer[Any, Any](op, (elem, _) => elem, null, op.typeOf)
   }
+
+  def unapply(arg: Aggregator): Option[Expr] = Some(arg.expr)
 
 }

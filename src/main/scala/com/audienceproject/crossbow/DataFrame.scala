@@ -100,8 +100,8 @@ class DataFrame private(private val columnData: List[Array[_]],
   def printSchema(): Unit = println(schema)
 
   private[crossbow] def merge(other: DataFrame): DataFrame = {
-    // TODO: Deduplicate columns.
-    new DataFrame(columnData ++ other.columnData, Schema(schema.columns ++ other.schema.columns))
+    val otherColumns = other.schema.columns.map(c => c.renamed("#" + c.name))
+    new DataFrame(columnData ++ other.columnData, Schema(schema.columns ++ otherColumns))
   }
 
   private[crossbow] def slice(indices: IndexedSeq[Int]): DataFrame = {
@@ -114,17 +114,19 @@ class DataFrame private(private val columnData: List[Array[_]],
 
   private def sliceColumn(op: Specialized[_], indices: Seq[Int] = 0 until rowCount): Array[_] = {
     op.typeOf match {
-      case IntType => fillArray[Int](indices, op.as[Int].apply)
-      case LongType => fillArray[Long](indices, op.as[Long].apply)
-      case DoubleType => fillArray[Double](indices, op.as[Double].apply)
-      case BooleanType => fillArray[Boolean](indices, op.as[Boolean].apply)
-      case _ => fillArray[Any](indices, op.apply)
+      case IntType => fillArray[Int](indices, op.as[Int].apply, 0)
+      case LongType => fillArray[Long](indices, op.as[Long].apply, 0L)
+      case DoubleType => fillArray[Double](indices, op.as[Double].apply, 0d)
+      case BooleanType => fillArray[Boolean](indices, op.as[Boolean].apply, false)
+      case _ => fillArray[Any](indices, op.apply, null)
     }
   }
 
-  private def fillArray[T: ClassTag](indices: Seq[Int], getValue: Int => T): Array[T] = {
+  private def fillArray[T: ClassTag](indices: Seq[Int], getValue: Int => T, getNull: => T): Array[T] = {
     val arr = new Array[T](indices.size)
-    for (i <- arr.indices) arr(i) = getValue(indices(i))
+    for (i <- arr.indices)
+      if (indices(i) >= 0) arr(i) = getValue(indices(i))
+      else arr(i) = getNull
     arr
   }
 

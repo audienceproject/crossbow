@@ -1,5 +1,6 @@
 package com.audienceproject.crossbow.algorithms
 
+import com.audienceproject.crossbow.exceptions.JoinException
 import com.audienceproject.crossbow.expr.{Expr, Order}
 import com.audienceproject.crossbow.{DataFrame, JoinType}
 
@@ -11,13 +12,12 @@ private[crossbow] object SortMergeJoin {
 
   def apply(left: DataFrame, right: DataFrame, joinExpr: Expr, joinType: JoinType): DataFrame = {
     val internalType = joinExpr.compile(left).typeOf
-    if (internalType != joinExpr.compile(right).typeOf) throw new RuntimeException("")
+    if (internalType != joinExpr.compile(right).typeOf) throw new JoinException(joinExpr)
 
     val ordering = Order.getOrdering(internalType)
 
-    val joinCol = Expr.Column(joinColName)
-    val leftSorted = left.addColumn(joinExpr as joinColName).sortBy(joinCol)
-    val rightSorted = right.addColumn(joinExpr as joinColName).sortBy(joinCol)
+    val leftSorted = left.addColumn(joinExpr as joinColName).sortBy(Expr.Column(joinColName))
+    val rightSorted = right.addColumn(joinExpr as joinColName).sortBy(Expr.Column(joinColName))
 
     val leftKey = leftSorted(joinColName).as[Any]
     val rightKey = rightSorted(joinColName).as[Any]
@@ -26,13 +26,14 @@ private[crossbow] object SortMergeJoin {
 
     def advance(start: Int, keyColumn: DataFrame#TypedView[Any]): Seq[Int] = {
       if (start >= keyColumn.size) Seq.empty
-      else if (start == keyColumn.size - 1) Seq(start)
       else {
         val key = keyColumn(start)
         Seq.unfold(start)(i => {
-          val nextKey = keyColumn(i)
-          if (ordering.equiv(key, nextKey)) Some(i, i + 1)
-          else None
+          if (i < keyColumn.size) {
+            val nextKey = keyColumn(i)
+            if (ordering.equiv(key, nextKey)) Some(i, i + 1)
+            else None
+          } else None
         })
       }
     }
@@ -43,6 +44,9 @@ private[crossbow] object SortMergeJoin {
         rightResult += y
       }
 
+    val isLeftJoin = joinType == JoinType.LeftOuter || joinType == JoinType.FullOuter
+    val isRightJoin = joinType == JoinType.RightOuter || joinType == JoinType.FullOuter
+
     var leftSet = advance(0, leftKey)
     var rightSet = advance(0, rightKey)
     while (leftSet.nonEmpty && rightSet.nonEmpty) {
@@ -52,11 +56,16 @@ private[crossbow] object SortMergeJoin {
         leftSet = advance(leftSet.last + 1, leftKey)
         rightSet = advance(rightSet.last + 1, rightKey)
       } else if (cmp < 0) {
+        if (isLeftJoin) addCartesianProduct(leftSet, Seq(-1))
         leftSet = advance(leftSet.last + 1, leftKey)
       } else {
+        if (isRightJoin) addCartesianProduct(Seq(-1), rightSet)
         rightSet = advance(rightSet.last + 1, rightKey)
       }
     }
+
+    if (leftSet.nonEmpty && isLeftJoin) addCartesianProduct(leftSet.head until leftSet.size, Seq(-1))
+    if (rightSet.nonEmpty && isRightJoin) addCartesianProduct(Seq(-1), rightSet.head until rightKey.size)
 
     val leftFinal = leftSorted.slice(leftResult.toIndexedSeq).removeColumns(joinColName)
     val rightFinal = rightSorted.slice(rightResult.toIndexedSeq).removeColumns(joinColName)
