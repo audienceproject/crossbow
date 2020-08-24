@@ -34,11 +34,11 @@ class DataFrame private(private val columnData: Vector[Array[_]],
   }
 
   def addColumn(expr: Expr): DataFrame = {
-    val op = expr.compile(this)
-    val newCol = sliceColumn(op)
+    val eval = expr.compile(this)
+    val newCol = sliceColumn(eval)
     val newColSchema = expr match {
-      case Expr.Named(columnName, _) => Column(columnName, op.typeOf)
-      case _ => Column(s"_$numColumns", op.typeOf)
+      case Expr.Named(columnName, _) => Column(columnName, eval.typeOf)
+      case _ => Column(s"_$numColumns", eval.typeOf)
     }
     new DataFrame(columnData :+ newCol, schema.add(newColSchema))
   }
@@ -55,29 +55,29 @@ class DataFrame private(private val columnData: Vector[Array[_]],
       case (Expr.Named(newName, Expr.Column(colName)), _) => (getColumnData(colName), schema.get(colName).renamed(newName))
       case (Expr.Column(colName), _) => (getColumnData(colName), schema.get(colName))
       case (expr, i) =>
-        val op = expr.compile(this)
+        val eval = expr.compile(this)
         val newColSchema = expr match {
-          case Expr.Named(columnName, _) => new Column(columnName, op.typeOf)
-          case _ => new Column(s"_$i", op.typeOf)
+          case Expr.Named(columnName, _) => new Column(columnName, eval.typeOf)
+          case _ => new Column(s"_$i", eval.typeOf)
         }
-        (sliceColumn(op), newColSchema)
+        (sliceColumn(eval), newColSchema)
     }).unzip
     new DataFrame(colData.toVector, Schema(colSchemas))
   }
 
   def filter(expr: Expr): DataFrame = {
-    val op = expr.compile(this).typecheckAs[Boolean]
-    val indices = for (i <- 0 until rowCount if op(i)) yield i
+    val eval = expr.compile(this).typecheckAs[Boolean]
+    val indices = for (i <- 0 until rowCount if eval(i)) yield i
     slice(indices)
   }
 
   def groupBy(keyExprs: Expr*): GroupedView = new GroupedView(keyExprs)
 
   def sortBy(expr: Expr, givenOrderings: Order*): DataFrame = {
-    val op = expr.compile(this)
-    val ord = Order.getOrdering(op.typeOf, givenOrderings)
+    val eval = expr.compile(this)
+    val ord = Order.getOrdering(eval.typeOf, givenOrderings)
     val indices = Array.tabulate(rowCount)(identity)
-    Sorting.quickSort[Int](indices)((x: Int, y: Int) => ord.compare(op(x), op(y)))
+    Sorting.quickSort[Int](indices)((x: Int, y: Int) => ord.compare(eval(x), eval(y)))
     slice(ArraySeq.unsafeWrapArray(indices))
   }
 
@@ -119,19 +119,19 @@ class DataFrame private(private val columnData: Vector[Array[_]],
 
   private[crossbow] def slice(indices: IndexedSeq[Int]): DataFrame = {
     val newData = schema.columns.map(col => {
-      val op = Expr.Column(col.name).compile(this)
-      sliceColumn(op, indices)
+      val eval = Expr.Column(col.name).compile(this)
+      sliceColumn(eval, indices)
     })
     new DataFrame(newData.toVector, schema)
   }
 
-  private def sliceColumn(op: Specialized[_], indices: Seq[Int] = 0 until rowCount): Array[_] = {
-    op.typeOf match {
-      case IntType => fillArray[Int](indices, op.as[Int].apply, 0)
-      case LongType => fillArray[Long](indices, op.as[Long].apply, 0L)
-      case DoubleType => fillArray[Double](indices, op.as[Double].apply, 0d)
-      case BooleanType => fillArray[Boolean](indices, op.as[Boolean].apply, false)
-      case _ => fillArray[Any](indices, op.apply, null)
+  private def sliceColumn(eval: Specialized[_], indices: Seq[Int] = 0 until rowCount): Array[_] = {
+    eval.typeOf match {
+      case IntType => fillArray[Int](indices, eval.as[Int].apply, 0)
+      case LongType => fillArray[Long](indices, eval.as[Long].apply, 0L)
+      case DoubleType => fillArray[Double](indices, eval.as[Double].apply, 0d)
+      case BooleanType => fillArray[Boolean](indices, eval.as[Boolean].apply, false)
+      case _ => fillArray[Any](indices, eval.apply, null)
     }
   }
 

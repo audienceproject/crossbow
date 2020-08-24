@@ -44,8 +44,8 @@ private[crossbow] object Expr {
 
   case class Lambda[T: ru.TypeTag, R: ru.TypeTag](expr: Expr, f: T => R) extends Expr {
     override private[crossbow] def compile(context: DataFrame) = {
-      val spec = expr.compile(context).typecheckAs[T]
-      specialize[R](i => f(spec(i)))
+      val eval = expr.compile(context).typecheckAs[T]
+      specialize[R](i => f(eval(i)))
     }
 
     def copy(newExpr: Expr): Lambda[T, R] = Lambda(newExpr, f)
@@ -53,9 +53,9 @@ private[crossbow] object Expr {
 
   case class Tuple(exprs: Expr*) extends Expr {
     override private[crossbow] def compile(context: DataFrame) = {
-      val elementSpecs = exprs.map(_.compile(context))
-      val productType = ProductType(elementSpecs.map(_.typeOf): _*)
-      elementSpecs match {
+      val evals = exprs.map(_.compile(context))
+      val productType = ProductType(evals.map(_.typeOf): _*)
+      evals match {
         case Seq(e1, e2) => specializeWithType[(_, _)](i => (e1(i), e2(i)), productType)
         case Seq(e1, e2, e3) => specializeWithType[(_, _, _)](i => (e1(i), e2(i), e3(i)), productType)
         case Seq(e1, e2, e3, e4) => specializeWithType[(_, _, _, _)](i => (e1(i), e2(i), e3(i), e4(i)), productType)
@@ -69,10 +69,10 @@ private[crossbow] object Expr {
     override private[crossbow] def compile(context: DataFrame) = {
       if (exprs.isEmpty) specialize[Seq[Nothing]](_ => Seq.empty)
       else {
-        val elementSpecs = exprs.map(_.compile(context))
-        val elementTypes = elementSpecs.map(_.typeOf)
-        if (elementTypes.distinct.size > 1) throw new InvalidExpressionException("List", elementTypes: _*)
-        specializeWithType[Seq[_]](i => elementSpecs.map(_ (i)), ListType(elementTypes.head))
+        val evals = exprs.map(_.compile(context))
+        val types = evals.map(_.typeOf)
+        if (types.distinct.size > 1) throw new InvalidExpressionException("List", types: _*)
+        specializeWithType[Seq[_]](i => evals.map(_ (i)), ListType(types.head))
       }
     }
   }

@@ -15,8 +15,8 @@ abstract class Aggregator(private val expr: Expr) extends Expr {
   override private[crossbow] def compile(context: DataFrame) = throw new AggregationException(this)
 
   private[crossbow] def reduceOn(context: DataFrame): Reducer[Any, Any] = {
-    val op = expr.compile(context)
-    typeSpec(op).asInstanceOf[Reducer[Any, Any]]
+    val eval = expr.compile(context)
+    typeSpec(eval).asInstanceOf[Reducer[Any, Any]]
   }
 
   protected def typeSpec(op: Specialized[_]): Reducer[_, _]
