@@ -10,7 +10,7 @@ Single node, in-memory DataFrame analytics library.
 ## Installing
 The library is available through Maven Central.
 
-SBT style dependency: `"com.audienceproject" %% "crossbow" % "0.1.0"`
+SBT style dependency: `"com.audienceproject" %% "crossbow" % "0.1.1"`
 
 # API
 ```scala
