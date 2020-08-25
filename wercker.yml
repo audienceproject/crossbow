@@ -8,10 +8,10 @@ build:
   steps:
     - script:
         name: Compile
-        code: sbt clean compile
+        code: sbt clean +compile
     - script:
         name: Test
-        code: sbt clean compile test
+        code: sbt +test
     - script:
         name: Clean again
         code: sbt clean

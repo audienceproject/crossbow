@@ -2,9 +2,10 @@ organization := "com.audienceproject"
 
 name := "crossbow"
 
-version := "0.1.0"
+version := "0.1.1"
 
 scalaVersion := "2.13.3"
+crossScalaVersions := Seq("2.12.12", "2.11.12")
 
 scalacOptions += "-deprecation"
 

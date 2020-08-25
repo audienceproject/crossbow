@@ -15,7 +15,7 @@ object Order {
         val implicitOrdering = internalType match {
           case IntType => Ordering.Int
           case LongType => Ordering.Long
-          case DoubleType => Ordering.Double.TotalOrdering
+          case DoubleType => DoubleOrdering
           case BooleanType => Ordering.Boolean
           case ProductType(elementTypes@_*) =>
             val tupleTypes = elementTypes.map(getOrdering(_, givens))
@@ -33,6 +33,10 @@ object Order {
         }
         implicitOrdering.asInstanceOf[Ordering[Any]]
     }
+  }
+
+  private object DoubleOrdering extends Ordering[Double] {
+    override def compare(x: Double, y: Double): Int = java.lang.Double.compare(x, y)
   }
 
 }

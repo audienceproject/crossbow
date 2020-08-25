@@ -36,7 +36,10 @@ class SortByTest extends AnyFunSuite {
 
     assertThrows[NoOrderingException](customDf.sortBy($"custom"))
 
-    val result = customDf.sortBy($"custom", Order.by[Custom]((c1, c2) => c1.x - c2.x)).select($"k").as[String].toSeq
+    val customOrdering = new Ordering[Custom] {
+      override def compare(c1: Custom, c2: Custom): Int = c1.x - c2.x
+    }
+    val result = customDf.sortBy($"custom", Order.by(customOrdering)).select($"k").as[String].toSeq
     val expected = Seq("a", "b", "c", "d")
     assert(result == expected)
   }

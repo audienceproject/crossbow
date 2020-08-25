@@ -4,6 +4,7 @@ import com.audienceproject.crossbow.exceptions.JoinException
 import com.audienceproject.crossbow.expr.{Expr, Order}
 import com.audienceproject.crossbow.{DataFrame, JoinType}
 
+import scala.annotation.tailrec
 import scala.collection.mutable
 
 private[crossbow] object SortMergeJoin {
@@ -28,13 +29,17 @@ private[crossbow] object SortMergeJoin {
       if (start >= keyColumn.size) Seq.empty
       else {
         val key = keyColumn(start)
-        Seq.unfold(start)(i => {
+
+        @tailrec
+        def indexOfNextKey(i: Int): Int = {
           if (i < keyColumn.size) {
             val nextKey = keyColumn(i)
-            if (ordering.equiv(key, nextKey)) Some(i, i + 1)
-            else None
-          } else None
-        })
+            if (ordering.equiv(key, nextKey)) indexOfNextKey(i + 1)
+            else i
+          } else i
+        }
+
+        start until indexOfNextKey(start + 1)
       }
     }
 

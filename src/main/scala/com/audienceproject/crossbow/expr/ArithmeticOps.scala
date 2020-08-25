@@ -130,8 +130,8 @@ private[crossbow] object ArithmeticOps {
 
   case class Negate(expr: Expr) extends UnaryExpr(expr) {
     override def typeSpec(operand: Specialized[_]): Specialized[_] = operand.typeOf match {
-      case LongType => specialize[Long, Long](operand, math.negateExact)
-      case IntType => specialize[Int, Int](operand, math.negateExact)
+      case LongType => specialize[Long, Long](operand, -_)
+      case IntType => specialize[Int, Int](operand, -_)
       case DoubleType => specialize[Double, Double](operand, -_)
       case _ => throw new InvalidExpressionException("Negate", operand.typeOf)
     }

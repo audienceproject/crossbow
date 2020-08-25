@@ -5,7 +5,6 @@ import com.audienceproject.crossbow.exceptions.IncorrectTypeException
 import com.audienceproject.crossbow.expr._
 import com.audienceproject.crossbow.schema.{Column, Schema}
 
-import scala.collection.immutable.ArraySeq
 import scala.reflect.ClassTag
 import scala.util.Sorting
 
@@ -86,10 +85,9 @@ class DataFrame private(private val columnData: Vector[Array[_]],
    * @return new DataFrame
    */
   def removeColumns(columnNames: String*): DataFrame = {
-    val remaining = for ((c, i) <- schema.columns.zipWithIndex if !columnNames.contains(c.name))
-      yield (columnData(i), c)
-    val (colData, colSchemas) = remaining.unzip
-    new DataFrame(colData.toVector, Schema(colSchemas))
+    val remainingIndices = for ((c, i) <- schema.columns.zipWithIndex if !columnNames.contains(c.name)) yield i
+    val colData = remainingIndices.map(columnData)
+    new DataFrame(colData.toVector, Schema(remainingIndices.map(schema.columns)))
   }
 
   /**
@@ -111,7 +109,7 @@ class DataFrame private(private val columnData: Vector[Array[_]],
           case _ => new Column(s"_$i", eval.typeOf)
         }
         (sliceColumn(eval), newColSchema)
-    }).unzip
+    }).unzip[Array[_], Column](p => (p._1, p._2))
     new DataFrame(colData.toVector, Schema(colSchemas))
   }
 
@@ -149,8 +147,10 @@ class DataFrame private(private val columnData: Vector[Array[_]],
     val eval = expr.compile(this)
     val ord = Order.getOrdering(eval.typeOf, givenOrderings)
     val indices = Array.tabulate(rowCount)(identity)
-    Sorting.quickSort[Int](indices)((x: Int, y: Int) => ord.compare(eval(x), eval(y)))
-    slice(ArraySeq.unsafeWrapArray(indices))
+    Sorting.quickSort[Int](indices)(new Ordering[Int] {
+      override def compare(x: Int, y: Int): Int = ord.compare(eval(x), eval(y))
+    })
+    slice(indices.toIndexedSeq)
   }
 
   /**
@@ -296,7 +296,7 @@ class DataFrame private(private val columnData: Vector[Array[_]],
 
     override def iterator: Iterator[T] = this (0 until rowCount).iterator
 
-    override def knownSize: Int = rowCount
+    override def size: Int = rowCount
   }
 
   override def isEmpty: Boolean = rowCount == 0
