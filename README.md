@@ -7,6 +7,11 @@ Single node, in-memory DataFrame analytics library.
 * Fluent expression DSL
 * Immutable public API; `Array` under the hood
 
+## Installing
+The library is available through Maven Central.
+
+SBT style dependency: `"com.audienceproject" %% "crossbow" % "0.1.0"`
+
 # API
 ```scala
 import com.audienceproject.crossbow.DataFrame
