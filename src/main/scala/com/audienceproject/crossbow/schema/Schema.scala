@@ -2,6 +2,8 @@ package com.audienceproject.crossbow.schema
 
 case class Schema(columns: Seq[Column] = Seq.empty) {
 
+  val size: Int = columns.length
+
   def add(column: Column): Schema = Schema(columns :+ column)
 
   def get(columnName: String): Column = columns.find(_.name == columnName).getOrElse(

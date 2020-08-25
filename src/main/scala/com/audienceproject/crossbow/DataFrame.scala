@@ -12,20 +12,49 @@ import scala.util.Sorting
 class DataFrame private(private val columnData: Vector[Array[_]],
                         val schema: Schema) extends Iterable[Seq[Any]] {
 
-  val rowCount: Int = columnData.head.length
+  val rowCount: Int = if (columnData.isEmpty) 0 else columnData.head.length
   val numColumns: Int = columnData.size
 
-  def apply(index: Int): Seq[Any] = columnData.map(_ (index))
+  /**
+   * Retrieve a single row by index.
+   *
+   * @param index row index
+   * @return row as a sequence of values
+   */
+  def apply(index: Int): Seq[Any] =
+    if (isEmpty) Seq.empty
+    else columnData.map(_ (index))
 
+  /**
+   * Retrieve a subset of rows from this DataFrame based on range of indices.
+   *
+   * @param range range of row indices to retrieve
+   * @return new DataFrame
+   */
   def apply(range: Range): DataFrame = slice(range)
 
+  /**
+   * Select a subset of columns from this DataFrame.
+   *
+   * @param columnNames names of columns to select
+   * @return new DataFrame
+   */
   def apply(columnNames: String*): DataFrame = {
     val colExprs = columnNames.map(Expr.Column)
     select(colExprs: _*)
   }
 
+  /**
+   * Typecast this DataFrame to a TypedView of the type parameter 'T'. All columns in this DataFrame will have to be
+   * accounted for in the given type. A DataFrame with multiple columns will have its rows represented as tuples
+   * of the individual types of these columns.
+   *
+   * @tparam T the type of a row in this DataFrame
+   * @return [[TypedView]] on the contents of this DataFrame
+   */
   def as[T: ru.TypeTag]: TypedView[T] = {
     val dataType = ru.typeOf[T]
+    if (numColumns == 0) throw new IncorrectTypeException(dataType, AnyType(ru.typeOf[Nothing]))
     val schemaType =
       if (numColumns == 1) schema.columns.head.columnType
       else ProductType(schema.columns.map(_.columnType): _*)
@@ -33,6 +62,13 @@ class DataFrame private(private val columnData: Vector[Array[_]],
     else throw new IncorrectTypeException(dataType, schemaType)
   }
 
+  /**
+   * Add a column to the DataFrame, evaluating to 'expr' at each individual row index.
+   * Use the 'as' method on [[Expr]] to give the column a name.
+   *
+   * @param expr the [[Expr]] to evaluate as the new column
+   * @return new DataFrame
+   */
   def addColumn(expr: Expr): DataFrame = {
     val eval = expr.compile(this)
     val newCol = sliceColumn(eval)
@@ -43,6 +79,12 @@ class DataFrame private(private val columnData: Vector[Array[_]],
     new DataFrame(columnData :+ newCol, schema.add(newColSchema))
   }
 
+  /**
+   * Remove one or more columns from the DataFrame.
+   *
+   * @param columnNames the names of the columns to remove
+   * @return new DataFrame
+   */
   def removeColumns(columnNames: String*): DataFrame = {
     val remaining = for ((c, i) <- schema.columns.zipWithIndex if !columnNames.contains(c.name))
       yield (columnData(i), c)
@@ -50,6 +92,14 @@ class DataFrame private(private val columnData: Vector[Array[_]],
     new DataFrame(colData.toVector, Schema(colSchemas))
   }
 
+  /**
+   * Map over this DataFrame, selecting a set of expressions which will become the columns of a new DataFrame.
+   * Use the 'as' method on [[Expr]] to give names to the new columns. An expression which is only a column accessor
+   * will inherit the accessed column's name (unless it is renamed).
+   *
+   * @param exprs the list of [[Expr]] to evaluate as a new DataFrame
+   * @return new DataFrame
+   */
   def select(exprs: Expr*): DataFrame = {
     val (colData, colSchemas) = exprs.zipWithIndex.map({
       case (Expr.Named(newName, Expr.Column(colName)), _) => (getColumnData(colName), schema.get(colName).renamed(newName))
@@ -65,14 +115,36 @@ class DataFrame private(private val columnData: Vector[Array[_]],
     new DataFrame(colData.toVector, Schema(colSchemas))
   }
 
+  /**
+   * Retrieve a subset of rows from this DataFrame based on the boolean evaluation of the given expression.
+   *
+   * @param expr the [[Expr]] to evaluate, if 'true' the given row will appear in the output
+   * @return new DataFrame
+   */
   def filter(expr: Expr): DataFrame = {
     val eval = expr.compile(this).typecheckAs[Boolean]
     val indices = for (i <- 0 until rowCount if eval(i)) yield i
     slice(indices)
   }
 
+  /**
+   * Partition this DataFrame into groups, defined by the given set of expressions.
+   * The evaluation of each of the 'keyExprs' will appear as a column in the output.
+   *
+   * @param keyExprs the list of [[Expr]] that will evaluate to the keys of the groups
+   * @return [[GroupedView]] on this DataFrame
+   */
   def groupBy(keyExprs: Expr*): GroupedView = new GroupedView(keyExprs)
 
+  /**
+   * Sort this DataFrame by the evaluation of 'expr'. If a natural ordering exists on this value, it will be used.
+   * User-defined orderings on other types or for overwriting the natural orderings with an explicit ordering can be
+   * supplied through the 'givenOrderings' argument.
+   *
+   * @param expr           the [[Expr]] to evaluate as a sort key
+   * @param givenOrderings explicit [[Order]] to use on the sort key, or list of [[Order]] if the key is a tuple
+   * @return new DataFrame
+   */
   def sortBy(expr: Expr, givenOrderings: Order*): DataFrame = {
     val eval = expr.compile(this)
     val ord = Order.getOrdering(eval.typeOf, givenOrderings)
@@ -81,9 +153,28 @@ class DataFrame private(private val columnData: Vector[Array[_]],
     slice(ArraySeq.unsafeWrapArray(indices))
   }
 
+  /**
+   * Join this DataFrame on another DataFrame, with the key evaluated by 'joinExpr'.
+   * The resulting DataFrame will contain all the columns of this DataFrame and the other, where the column names of
+   * the other will be prepended with "#".
+   *
+   * @note 'joinExpr' must evaluate to a type with a natural ordering
+   * @param other    DataFrame to join with this one
+   * @param joinExpr [[Expr]] to evaluate as join key
+   * @param joinType [[JoinType]] as one of Inner, FullOuter, LeftOuter or RightOuter
+   * @return new DataFrame
+   */
   def join(other: DataFrame, joinExpr: Expr, joinType: JoinType = JoinType.Inner): DataFrame =
     SortMergeJoin(this, other, joinExpr, joinType)
 
+  /**
+   * Union this DataFrame with another DataFrame. Columns will be matched by name, and if matched they must have the
+   * same type. Columns that are not present in one or the other DataFrame will contain null-values in the output
+   * for the rows of the DataFrame in which the column was not present.
+   *
+   * @param other DataFrame to union with this one
+   * @return new DataFrame
+   */
   def union(other: DataFrame): DataFrame = {
     if (schema == other.schema) {
       val colData = for (i <- 0 until numColumns) yield columnData(i) ++ other.columnData(i)
@@ -99,12 +190,24 @@ class DataFrame private(private val columnData: Vector[Array[_]],
     }
   }
 
+  /**
+   * Rename the columns of this DataFrame.
+   *
+   * @param newNames list of new names for each column of this DataFrame
+   * @return new DataFrame
+   */
   def renameColumns(newNames: String*): DataFrame = {
     if (newNames.size != numColumns) throw new IllegalArgumentException("Wrong number of column names given.")
     val columnSchemas = schema.columns.zip(newNames).map({ case (col, name) => col.renamed(name) })
     new DataFrame(columnData, Schema(columnSchemas))
   }
 
+  /**
+   * Rename the columns of this DataFrame by applying the given function.
+   *
+   * @param toNewName function to map over the names of the columns
+   * @return new DataFrame
+   */
   def renameColumns(toNewName: String => String): DataFrame = {
     val columnSchemas = schema.columns.map(col => col.renamed(toNewName(col.name)))
     new DataFrame(columnData, Schema(columnSchemas))
@@ -113,7 +216,7 @@ class DataFrame private(private val columnData: Vector[Array[_]],
   def printSchema(): Unit = println(schema)
 
   private[crossbow] def merge(other: DataFrame): DataFrame = {
-    val otherColumns = other.schema.columns.map(c => c.renamed("#" + c.name))
+    val otherColumns = other.schema.columns.map(col => col.renamed("#" + col.name))
     new DataFrame(columnData ++ other.columnData, Schema(schema.columns ++ otherColumns))
   }
 
@@ -159,14 +262,36 @@ class DataFrame private(private val columnData: Vector[Array[_]],
   }
 
   class GroupedView private[DataFrame](keyExprs: Seq[Expr]) {
+    /**
+     * Aggregate this GroupedView to a new DataFrame, evaluated by the list of aggregation expressions.
+     * An aggregation expression can be any expression, but it must contain [[Aggregator]] expressions instead
+     * of column accessors. The [[Aggregator]] expressions themselves may contain arbitrary expressions with
+     * combinations of column accessors.
+     * Use the 'as' method on [[Expr]] to name the resulting columns.
+     *
+     * @param aggExprs the list of [[Expr]] used to aggregate the values of the groups
+     * @return new DataFrame
+     */
     def agg(aggExprs: Expr*): DataFrame = GroupBy(DataFrame.this, keyExprs, aggExprs)
   }
 
   class TypedView[T] private[DataFrame]() extends Iterable[T] {
     private implicit val t2Tuple: Seq[Any] => T = toTuple[T](numColumns)
 
+    /**
+     * Retrieve a single row by index.
+     *
+     * @param index row index
+     * @return row as a value of type 'T'
+     */
     def apply(index: Int): T = DataFrame.this (index)
 
+    /**
+     * Retrieve a subset of rows from this view based on range of indices.
+     *
+     * @param range range of row indices to retrieve
+     * @return sequence of rows of type 'T'
+     */
     def apply(range: Range): Seq[T] = for (i <- range) yield this (i)
 
     override def iterator: Iterator[T] = this (0 until rowCount).iterator
@@ -174,12 +299,21 @@ class DataFrame private(private val columnData: Vector[Array[_]],
     override def knownSize: Int = rowCount
   }
 
+  override def isEmpty: Boolean = rowCount == 0
+
   override def iterator: Iterator[Seq[Any]] = (for (i <- 0 until rowCount) yield this (i)).iterator
 
 }
 
 object DataFrame {
 
+  /**
+   * Construct a new DataFrame from a sequence of rows.
+   *
+   * @param data the sequence of rows which will form the new DataFrame
+   * @tparam T the type of a row, if this is a [[Product]] type each element will become a separate column
+   * @return new DataFrame
+   */
   def fromSeq[T: ru.TypeTag](data: Seq[T]): DataFrame = {
     if (data.isEmpty) new DataFrame(Vector.empty, Schema())
     else {
@@ -197,7 +331,18 @@ object DataFrame {
     }
   }
 
+  /**
+   * Construct a new DataFrame from a list of columns and a schema.
+   *
+   * @param columns the columns of the new DataFrame
+   * @param schema  the [[Schema]] of the new DataFrame, where each entry matches with the data in the 'columns' list
+   * @return new DataFrame
+   */
   def fromColumns(columns: IndexedSeq[Seq[Any]], schema: Schema): DataFrame = {
+    if (columns.size != schema.size)
+      throw new IllegalArgumentException(s"Number of columns is ${columns.size}, but schema is ${schema.size}")
+    if (columns.exists(_.size != columns.head.size))
+      throw new IllegalArgumentException("All columns must have the same number of rows.")
     val columnData = columns.zip(schema.columns).map({ case (data, col) => convert(data, col.columnType) })
     new DataFrame(columnData.toVector, schema)
   }
