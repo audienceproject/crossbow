@@ -177,14 +177,17 @@ class DataFrame private(private val columnData: Vector[Array[_]],
    */
   def union(other: DataFrame): DataFrame = {
     if (schema == other.schema) {
-      val colData = for (i <- 0 until numColumns) yield columnData(i) ++ other.columnData(i)
+      val colData = for (i <- 0 until numColumns) yield {
+        val combinedData = Seq(columnData(i), other.columnData(i))
+        spliceColumns(combinedData, schema.columns(i).columnType)
+      }
       new DataFrame(colData.toVector, schema)
     } else {
       val matchingColumns = schema.matchColumns(other.schema)
       val colData = matchingColumns.map({
-        case (_, Left((i, j))) => columnData(i) ++ other.columnData(j)
-        case (c, Right(Left(i))) => columnData(i) ++ fillNullArray(other.rowCount, c.columnType)
-        case (c, Right(Right(j))) => fillNullArray(rowCount, c.columnType) ++ other.columnData(j)
+        case (c, Left((i, j))) => spliceColumns(Seq(columnData(i), other.columnData(j)), c.columnType)
+        case (c, Right(Left(i))) => padColumn(columnData(i), c.columnType, padding = -other.rowCount)
+        case (c, Right(Right(j))) => padColumn(other.columnData(j), c.columnType, padding = rowCount)
       })
       new DataFrame(colData.toVector, Schema(matchingColumns.map(_._1)))
     }
@@ -228,32 +231,51 @@ class DataFrame private(private val columnData: Vector[Array[_]],
     new DataFrame(newData.toVector, schema)
   }
 
-  private def sliceColumn(eval: Specialized[_], indices: Seq[Int] = 0 until rowCount): Array[_] = {
+  private def sliceColumn(eval: Specialized[_], indices: IndexedSeq[Int] = 0 until rowCount): Array[_] = {
     eval.typeOf match {
-      case IntType => fillArray[Int](indices, eval.as[Int].apply, 0)
-      case LongType => fillArray[Long](indices, eval.as[Long].apply, 0L)
-      case DoubleType => fillArray[Double](indices, eval.as[Double].apply, 0d)
-      case BooleanType => fillArray[Boolean](indices, eval.as[Boolean].apply, false)
-      case _ => fillArray[Any](indices, eval.apply, null)
+      case IntType => fillArray[Int](indices, eval.as[Int].apply)
+      case LongType => fillArray[Long](indices, eval.as[Long].apply)
+      case DoubleType => fillArray[Double](indices, eval.as[Double].apply)
+      case BooleanType => fillArray[Boolean](indices, eval.as[Boolean].apply)
+      case _ => fillArray[Any](indices, eval.apply)
     }
   }
 
-  private def fillArray[T: ClassTag](indices: Seq[Int], getValue: Int => T, getNull: => T): Array[T] = {
-    val arr = new Array[T](indices.size)
-    for (i <- arr.indices)
-      if (indices(i) >= 0) arr(i) = getValue(indices(i))
-      else arr(i) = getNull
+  private def padColumn(data: Array[_], ofType: Type, padding: Int): Array[_] = {
+    ofType match {
+      case IntType => fillArray[Int](data.indices, data.asInstanceOf[Array[Int]], padding)
+      case LongType => fillArray[Long](data.indices, data.asInstanceOf[Array[Long]], padding)
+      case DoubleType => fillArray[Double](data.indices, data.asInstanceOf[Array[Double]], padding)
+      case BooleanType => fillArray[Boolean](data.indices, data.asInstanceOf[Array[Boolean]], padding)
+      case _ => fillArray[Any](data.indices, data.asInstanceOf[Array[Any]], padding)
+    }
+  }
+
+  private def fillArray[T: ClassTag](indices: IndexedSeq[Int], getValue: Int => T, padding: Int = 0): Array[T] = {
+    val arr = new Array[T](indices.size + math.abs(padding))
+    val indexOffset = math.max(padding, 0)
+    for (i <- indices.indices if indices(i) >= 0) arr(i + indexOffset) = getValue(indices(i))
     arr
   }
 
-  private def fillNullArray(size: Int, ofType: Type): Array[_] = {
+  private def spliceColumns(data: Seq[Array[_]], ofType: Type): Array[_] = {
     ofType match {
-      case IntType => Array.fill[Int](size)(0)
-      case LongType => Array.fill[Long](size)(0L)
-      case DoubleType => Array.fill[Double](size)(0d)
-      case BooleanType => Array.fill[Boolean](size)(false)
-      case _ => Array.fill[Any](size)(null)
+      case IntType => fillNArray[Int](data.map(_.asInstanceOf[Array[Int]]))
+      case LongType => fillNArray[Long](data.map(_.asInstanceOf[Array[Long]]))
+      case DoubleType => fillNArray[Double](data.map(_.asInstanceOf[Array[Double]]))
+      case BooleanType => fillNArray[Boolean](data.map(_.asInstanceOf[Array[Boolean]]))
+      case _ => fillNArray[Any](data.map(_.asInstanceOf[Array[Any]]))
     }
+  }
+
+  private def fillNArray[T: ClassTag](nData: Seq[Array[T]]): Array[T] = {
+    val arr = new Array[T](nData.map(_.length).sum)
+    nData.foldLeft(0) {
+      case (offset, data) =>
+        for (i <- data.indices) arr(i + offset) = data(i)
+        data.length
+    }
+    arr
   }
 
   private[crossbow] def getColumnData(columnName: String): Array[_] = {
