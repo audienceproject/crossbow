@@ -9,7 +9,7 @@ object Implicits {
 
   // Column expression.
   implicit class ColumnByName(val sc: StringContext) extends AnyVal {
-    def $(args: Any*): Expr = Expr.Column(sc.s(args: _*))
+    def $(args: Any*): Expr = Expr.Cell(sc.s(args: _*))
   }
 
   // Literal value.

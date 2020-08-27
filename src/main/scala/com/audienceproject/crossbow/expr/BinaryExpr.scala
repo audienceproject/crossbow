@@ -20,8 +20,8 @@ protected abstract class BinaryExpr(private val lhs: Expr, private val rhs: Expr
 
 private[crossbow] object BinaryExpr {
 
-  case class BinaryOp[T, U, V: ru.TypeTag](lhs: Specialized[T], rhs: Specialized[U],
-                                           op: (T, U) => V)
+  private[BinaryExpr] case class BinaryOp[T, U, V: ru.TypeTag](lhs: Specialized[T], rhs: Specialized[U],
+                                                               op: (T, U) => V)
     extends Specialized[V] {
     override def apply(i: Int): V = op(lhs(i), rhs(i))
   }

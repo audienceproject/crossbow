@@ -17,8 +17,8 @@ private[crossbow] object SortMergeJoin {
 
     val ordering = Order.getOrdering(internalType)
 
-    val leftSorted = left.addColumn(joinExpr as joinColName).sortBy(Expr.Column(joinColName))
-    val rightSorted = right.addColumn(joinExpr as joinColName).sortBy(Expr.Column(joinColName))
+    val leftSorted = left.addColumn(joinExpr as joinColName).sortBy(Expr.Cell(joinColName))
+    val rightSorted = right.addColumn(joinExpr as joinColName).sortBy(Expr.Cell(joinColName))
 
     val leftKey = leftSorted(joinColName).as[Any]
     val rightKey = rightSorted(joinColName).as[Any]

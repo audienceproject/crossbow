@@ -13,7 +13,7 @@ private[crossbow] object Expr {
     override private[crossbow] def compile(context: DataFrame) = expr.compile(context)
   }
 
-  case class Column(columnName: String) extends Expr {
+  case class Cell(columnName: String) extends Expr {
     override private[crossbow] def compile(context: DataFrame) = {
       val columnType = context.schema.get(columnName).columnType
       columnType match {

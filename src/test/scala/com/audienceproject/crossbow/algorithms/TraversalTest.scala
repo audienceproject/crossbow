@@ -12,7 +12,7 @@ class TraversalTest extends AnyFunSuite {
 
   test("Transform expression tree") {
     val transformedExpr = Traversal.transform(aggExpr, {
-      case _: Aggregator => Expr.Column("42")
+      case _: Aggregator => Expr.Cell("42")
     })
     val expected = $"42" + $"42" / 2 * $"42"
     assert(transformedExpr == expected)
@@ -22,7 +22,7 @@ class TraversalTest extends AnyFunSuite {
     val list = mutable.ListBuffer.empty[Expr]
     val transformedExpr = Traversal.transform(aggExpr, {
       case _: Aggregator =>
-        val newCol = Expr.Column(s"_${list.size}")
+        val newCol = Expr.Cell(s"_${list.size}")
         list += newCol
         newCol
     })

@@ -14,8 +14,8 @@ private[crossbow] object GroupBy {
     val selectExprs = aggExprs.map(Traversal.transform(_, {
       case agg: Aggregator =>
         aggregators += agg
-        Expr.Column(s"_res${aggregators.size}")
-      case col: Expr.Column => throw new AggregationException(col)
+        Expr.Cell(s"_res${aggregators.size}")
+      case col: Expr.Cell => throw new AggregationException(col)
     }))
 
     val keyEvals = keyExprs.map(_.compile(dataFrame)).toList
@@ -34,14 +34,14 @@ private[crossbow] object GroupBy {
 
     val keyNames = keyExprs.zipWithIndex.map({
       case (Expr.Named(name, _), _) => name
-      case (Expr.Column(name), _) => name
+      case (Expr.Cell(name), _) => name
       case (_, i) => s"_key$i"
     })
     val keySchemaCols = keyNames.zip(keyEvals).map({ case (name, eval) => Column(name, eval.typeOf) }).toList
     val dataSchemaCols = reducers.zipWithIndex.map({ case (reducer, i) => Column(s"_res${i + 1}", reducer.typeOf) })
 
     val temp = DataFrame.fromColumns(newKeyCols ++ newDataCols, Schema(keySchemaCols ++ dataSchemaCols))
-    temp.select(keySchemaCols.map(c => Expr.Column(c.name)) ++ selectExprs: _*)
+    temp.select(keySchemaCols.map(c => Expr.Cell(c.name)) ++ selectExprs: _*)
   }
 
 }

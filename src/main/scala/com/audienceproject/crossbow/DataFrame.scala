@@ -39,7 +39,7 @@ class DataFrame private(private val columnData: Vector[Array[_]],
    * @return new DataFrame
    */
   def apply(columnNames: String*): DataFrame = {
-    val colExprs = columnNames.map(Expr.Column)
+    val colExprs = columnNames.map(Expr.Cell)
     select(colExprs: _*)
   }
 
@@ -100,8 +100,8 @@ class DataFrame private(private val columnData: Vector[Array[_]],
    */
   def select(exprs: Expr*): DataFrame = {
     val (colData, colSchemas) = exprs.zipWithIndex.map({
-      case (Expr.Named(newName, Expr.Column(colName)), _) => (getColumnData(colName), schema.get(colName).renamed(newName))
-      case (Expr.Column(colName), _) => (getColumnData(colName), schema.get(colName))
+      case (Expr.Named(newName, Expr.Cell(colName)), _) => (getColumnData(colName), schema.get(colName).renamed(newName))
+      case (Expr.Cell(colName), _) => (getColumnData(colName), schema.get(colName))
       case (expr, i) =>
         val eval = expr.compile(this)
         val newColSchema = expr match {
@@ -225,7 +225,7 @@ class DataFrame private(private val columnData: Vector[Array[_]],
 
   private[crossbow] def slice(indices: IndexedSeq[Int]): DataFrame = {
     val newData = schema.columns.map(col => {
-      val eval = Expr.Column(col.name).compile(this)
+      val eval = Expr.Cell(col.name).compile(this)
       sliceColumn(eval, indices)
     })
     new DataFrame(newData.toVector, schema)

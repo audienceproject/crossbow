@@ -11,7 +11,7 @@ build:
         code: sbt clean +compile
     - script:
         name: Test
-        code: sbt +test
+        code: sbt test
     - script:
         name: Clean again
         code: sbt clean
