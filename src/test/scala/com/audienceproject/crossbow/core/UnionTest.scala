@@ -26,4 +26,11 @@ class UnionTest extends AnyFunSuite {
     assertThrows[IllegalArgumentException](left.union(right))
   }
 
+  test("Union all") {
+    val df = DataFrame.fromSeq(Seq(("a", 1), ("b", 2), ("c", 3)))
+    val result = DataFrame.unionAll(Seq(df, df, df)).as[(String, Int)].toSeq
+    val expected = df.union(df).union(df).as[(String, Int)].toSeq
+    assert(result == expected)
+  }
+
 }

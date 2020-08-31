@@ -1,7 +1,6 @@
 package com.audienceproject.crossbow.algorithms
 
-import com.audienceproject.crossbow.exceptions.JoinException
-import com.audienceproject.crossbow.expr.{Expr, Order}
+import com.audienceproject.crossbow.expr.Expr
 import com.audienceproject.crossbow.{DataFrame, JoinType}
 
 import scala.annotation.tailrec
@@ -9,19 +8,12 @@ import scala.collection.mutable
 
 private[crossbow] object SortMergeJoin {
 
-  private val joinColName = "_joinExpr"
+  // NOTE: 'left' and 'right' are assumed to be sorted on 'joinExpr' in advance.
+  def apply(left: DataFrame, right: DataFrame, joinExpr: Expr, joinType: JoinType,
+            ordering: Ordering[Any]): DataFrame = {
 
-  def apply(left: DataFrame, right: DataFrame, joinExpr: Expr, joinType: JoinType): DataFrame = {
-    val internalType = joinExpr.compile(left).typeOf
-    if (internalType != joinExpr.compile(right).typeOf) throw new JoinException(joinExpr)
-
-    val ordering = Order.getOrdering(internalType)
-
-    val leftSorted = left.addColumn(joinExpr as joinColName).sortBy(Expr.Cell(joinColName))
-    val rightSorted = right.addColumn(joinExpr as joinColName).sortBy(Expr.Cell(joinColName))
-
-    val leftKey = leftSorted(joinColName).as[Any]
-    val rightKey = rightSorted(joinColName).as[Any]
+    val leftKey = left.select(joinExpr).as[Any]
+    val rightKey = right.select(joinExpr).as[Any]
 
     val (leftResult, rightResult) = resultBuffers(left, right, joinType)
 
@@ -72,8 +64,8 @@ private[crossbow] object SortMergeJoin {
     if (leftSet.nonEmpty && isLeftJoin) addCartesianProduct(leftSet.head until leftSet.size, Seq(-1))
     if (rightSet.nonEmpty && isRightJoin) addCartesianProduct(Seq(-1), rightSet.head until rightKey.size)
 
-    val leftFinal = leftSorted.slice(leftResult.toIndexedSeq).removeColumns(joinColName)
-    val rightFinal = rightSorted.slice(rightResult.toIndexedSeq).removeColumns(joinColName)
+    val leftFinal = left.slice(leftResult.toIndexedSeq)
+    val rightFinal = right.slice(rightResult.toIndexedSeq)
     leftFinal.merge(rightFinal)
   }
 

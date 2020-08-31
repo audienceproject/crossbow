@@ -1,15 +1,14 @@
 package com.audienceproject.crossbow
 
 import com.audienceproject.crossbow.algorithms.{GroupBy, SortMergeJoin}
-import com.audienceproject.crossbow.exceptions.IncorrectTypeException
+import com.audienceproject.crossbow.exceptions.{IncorrectTypeException, JoinException}
 import com.audienceproject.crossbow.expr._
 import com.audienceproject.crossbow.schema.{Column, Schema}
 
-import scala.reflect.ClassTag
 import scala.util.Sorting
 
-class DataFrame private(private val columnData: Vector[Array[_]],
-                        val schema: Schema) extends Iterable[Seq[Any]] {
+class DataFrame private(private val columnData: Vector[Array[_]], val schema: Schema,
+                        private val sortKey: Option[Expr] = None) {
 
   val rowCount: Int = if (columnData.isEmpty) 0 else columnData.head.length
   val numColumns: Int = columnData.size
@@ -30,7 +29,7 @@ class DataFrame private(private val columnData: Vector[Array[_]],
    * @param range range of row indices to retrieve
    * @return new DataFrame
    */
-  def apply(range: Range): DataFrame = slice(range)
+  def apply(range: Range): DataFrame = slice(range, sortKey)
 
   /**
    * Select a subset of columns from this DataFrame.
@@ -70,7 +69,7 @@ class DataFrame private(private val columnData: Vector[Array[_]],
    */
   def addColumn(expr: Expr): DataFrame = {
     val eval = expr.compile(this)
-    val newCol = sliceColumn(eval)
+    val newCol = sliceColumn(eval, 0 until rowCount)
     val newColSchema = expr match {
       case Expr.Named(columnName, _) => Column(columnName, eval.typeOf)
       case _ => Column(s"_$numColumns", eval.typeOf)
@@ -108,7 +107,7 @@ class DataFrame private(private val columnData: Vector[Array[_]],
           case Expr.Named(columnName, _) => new Column(columnName, eval.typeOf)
           case _ => new Column(s"_$i", eval.typeOf)
         }
-        (sliceColumn(eval), newColSchema)
+        (sliceColumn(eval, 0 until rowCount), newColSchema)
     }).unzip[Array[_], Column](p => (p._1, p._2))
     new DataFrame(colData.toVector, Schema(colSchemas))
   }
@@ -122,7 +121,7 @@ class DataFrame private(private val columnData: Vector[Array[_]],
   def filter(expr: Expr): DataFrame = {
     val eval = expr.compile(this).typecheckAs[Boolean]
     val indices = for (i <- 0 until rowCount if eval(i)) yield i
-    slice(indices)
+    slice(indices, sortKey)
   }
 
   /**
@@ -150,7 +149,7 @@ class DataFrame private(private val columnData: Vector[Array[_]],
     Sorting.quickSort[Int](indices)(new Ordering[Int] {
       override def compare(x: Int, y: Int): Int = ord.compare(eval(x), eval(y))
     })
-    slice(indices.toIndexedSeq)
+    slice(indices.toIndexedSeq, Some(expr))
   }
 
   /**
@@ -164,8 +163,14 @@ class DataFrame private(private val columnData: Vector[Array[_]],
    * @param joinType [[JoinType]] as one of Inner, FullOuter, LeftOuter or RightOuter
    * @return new DataFrame
    */
-  def join(other: DataFrame, joinExpr: Expr, joinType: JoinType = JoinType.Inner): DataFrame =
-    SortMergeJoin(this, other, joinExpr, joinType)
+  def join(other: DataFrame, joinExpr: Expr, joinType: JoinType = JoinType.Inner): DataFrame = {
+    val internalType = joinExpr.compile(this).typeOf
+    if (internalType != joinExpr.compile(other).typeOf) throw new JoinException(joinExpr)
+    val ordering = Order.getOrdering(internalType)
+    val left = if (sortKey.contains(joinExpr)) this else this.sortBy(joinExpr)
+    val right = if (other.sortKey.contains(joinExpr)) other else other.sortBy(joinExpr)
+    SortMergeJoin(left, right, joinExpr, joinType, ordering)
+  }
 
   /**
    * Union this DataFrame with another DataFrame. Columns will be matched by name, and if matched they must have the
@@ -223,59 +228,12 @@ class DataFrame private(private val columnData: Vector[Array[_]],
     new DataFrame(columnData ++ other.columnData, Schema(schema.columns ++ otherColumns))
   }
 
-  private[crossbow] def slice(indices: IndexedSeq[Int]): DataFrame = {
+  private[crossbow] def slice(indices: IndexedSeq[Int], slicedSortKey: Option[Expr] = None): DataFrame = {
     val newData = schema.columns.map(col => {
       val eval = Expr.Cell(col.name).compile(this)
       sliceColumn(eval, indices)
     })
-    new DataFrame(newData.toVector, schema)
-  }
-
-  private def sliceColumn(eval: Specialized[_], indices: IndexedSeq[Int] = 0 until rowCount): Array[_] = {
-    eval.typeOf match {
-      case IntType => fillArray[Int](indices, eval.as[Int].apply)
-      case LongType => fillArray[Long](indices, eval.as[Long].apply)
-      case DoubleType => fillArray[Double](indices, eval.as[Double].apply)
-      case BooleanType => fillArray[Boolean](indices, eval.as[Boolean].apply)
-      case _ => fillArray[Any](indices, eval.apply)
-    }
-  }
-
-  private def padColumn(data: Array[_], ofType: Type, padding: Int): Array[_] = {
-    ofType match {
-      case IntType => fillArray[Int](data.indices, data.asInstanceOf[Array[Int]], padding)
-      case LongType => fillArray[Long](data.indices, data.asInstanceOf[Array[Long]], padding)
-      case DoubleType => fillArray[Double](data.indices, data.asInstanceOf[Array[Double]], padding)
-      case BooleanType => fillArray[Boolean](data.indices, data.asInstanceOf[Array[Boolean]], padding)
-      case _ => fillArray[Any](data.indices, data.asInstanceOf[Array[Any]], padding)
-    }
-  }
-
-  private def fillArray[T: ClassTag](indices: IndexedSeq[Int], getValue: Int => T, padding: Int = 0): Array[T] = {
-    val arr = new Array[T](indices.size + math.abs(padding))
-    val indexOffset = math.max(padding, 0)
-    for (i <- indices.indices if indices(i) >= 0) arr(i + indexOffset) = getValue(indices(i))
-    arr
-  }
-
-  private def spliceColumns(data: Seq[Array[_]], ofType: Type): Array[_] = {
-    ofType match {
-      case IntType => fillNArray[Int](data.map(_.asInstanceOf[Array[Int]]))
-      case LongType => fillNArray[Long](data.map(_.asInstanceOf[Array[Long]]))
-      case DoubleType => fillNArray[Double](data.map(_.asInstanceOf[Array[Double]]))
-      case BooleanType => fillNArray[Boolean](data.map(_.asInstanceOf[Array[Boolean]]))
-      case _ => fillNArray[Any](data.map(_.asInstanceOf[Array[Any]]))
-    }
-  }
-
-  private def fillNArray[T: ClassTag](nData: Seq[Array[T]]): Array[T] = {
-    val arr = new Array[T](nData.map(_.length).sum)
-    nData.foldLeft(0) {
-      case (offset, data) =>
-        for (i <- data.indices) arr(i + offset) = data(i)
-        data.length
-    }
-    arr
+    new DataFrame(newData.toVector, schema, slicedSortKey)
   }
 
   private[crossbow] def getColumnData(columnName: String): Array[_] = {
@@ -321,9 +279,18 @@ class DataFrame private(private val columnData: Vector[Array[_]],
     override def size: Int = rowCount
   }
 
-  override def isEmpty: Boolean = rowCount == 0
+  def isEmpty: Boolean = rowCount == 0
 
-  override def iterator: Iterator[Seq[Any]] = (for (i <- 0 until rowCount) yield this (i)).iterator
+  def iterator: Iterator[Seq[Any]] = new Iterator[Seq[Any]] {
+    private var pos = -1
+
+    override def hasNext: Boolean = pos < rowCount - 1
+
+    override def next(): Seq[Any] = {
+      pos += 1
+      DataFrame.this (pos)
+    }
+  }
 
 }
 
@@ -369,13 +336,23 @@ object DataFrame {
     new DataFrame(columnData.toVector, schema)
   }
 
-  private def convert(data: Seq[Any], dataType: Type): Array[_] = {
-    dataType match {
-      case IntType => data.asInstanceOf[Seq[Int]].toArray
-      case LongType => data.asInstanceOf[Seq[Long]].toArray
-      case DoubleType => data.asInstanceOf[Seq[Double]].toArray
-      case BooleanType => data.asInstanceOf[Seq[Boolean]].toArray
-      case _ => data.toArray
+  /**
+   * Unions all into a single DataFrame. All DataFrames must have the same schema.
+   *
+   * @param dataFrames list of DataFrame to union
+   * @return new DataFrame
+   */
+  def unionAll(dataFrames: Seq[DataFrame]): DataFrame = {
+    if (dataFrames.isEmpty) new DataFrame(Vector.empty, Schema())
+    else {
+      val schema = dataFrames.head.schema
+      if (!dataFrames.tail.forall(_.schema == schema))
+        throw new IllegalArgumentException("All DataFrames in unionAll must have the same schema.")
+      val colData = for (i <- 0 until schema.size) yield {
+        val combinedData = dataFrames.map(_.columnData(i))
+        spliceColumns(combinedData, schema.columns(i).columnType)
+      }
+      new DataFrame(colData.toVector, schema)
     }
   }
 

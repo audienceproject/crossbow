@@ -2,7 +2,7 @@ organization := "com.audienceproject"
 
 name := "crossbow"
 
-version := "0.1.2"
+version := "0.1.3"
 
 scalaVersion := "2.13.3"
 crossScalaVersions := Seq(scalaVersion.value, "2.12.12", "2.11.12")
