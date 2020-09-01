@@ -143,7 +143,7 @@ class DataFrame private(private val columnData: Vector[Array[_]], val schema: Sc
    * @return new DataFrame
    */
   def sortBy(expr: Expr, givenOrderings: Order*): DataFrame = {
-    if (sortKey.contains(expr)) this
+    if (sortKey.contains(expr) && givenOrderings.isEmpty) this
     else {
       val eval = expr.compile(this)
       val ord = Order.getOrdering(eval.typeOf, givenOrderings)
