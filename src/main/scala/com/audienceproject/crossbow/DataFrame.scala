@@ -143,13 +143,16 @@ class DataFrame private(private val columnData: Vector[Array[_]], val schema: Sc
    * @return new DataFrame
    */
   def sortBy(expr: Expr, givenOrderings: Order*): DataFrame = {
-    val eval = expr.compile(this)
-    val ord = Order.getOrdering(eval.typeOf, givenOrderings)
-    val indices = Array.tabulate(rowCount)(identity)
-    Sorting.quickSort[Int](indices)(new Ordering[Int] {
-      override def compare(x: Int, y: Int): Int = ord.compare(eval(x), eval(y))
-    })
-    slice(indices.toIndexedSeq, Some(expr))
+    if (sortKey.contains(expr)) this
+    else {
+      val eval = expr.compile(this)
+      val ord = Order.getOrdering(eval.typeOf, givenOrderings)
+      val indices = Array.tabulate(rowCount)(identity)
+      Sorting.quickSort[Int](indices)(new Ordering[Int] {
+        override def compare(x: Int, y: Int): Int = ord.compare(eval(x), eval(y))
+      })
+      slice(indices.toIndexedSeq, if (givenOrderings.isEmpty) Some(expr) else None)
+    }
   }
 
   /**
@@ -167,9 +170,7 @@ class DataFrame private(private val columnData: Vector[Array[_]], val schema: Sc
     val internalType = joinExpr.compile(this).typeOf
     if (internalType != joinExpr.compile(other).typeOf) throw new JoinException(joinExpr)
     val ordering = Order.getOrdering(internalType)
-    val left = if (sortKey.contains(joinExpr)) this else this.sortBy(joinExpr)
-    val right = if (other.sortKey.contains(joinExpr)) other else other.sortBy(joinExpr)
-    SortMergeJoin(left, right, joinExpr, joinType, ordering)
+    SortMergeJoin(this.sortBy(joinExpr), other.sortBy(joinExpr), joinExpr, joinType, ordering)
   }
 
   /**

@@ -6,7 +6,7 @@ import org.scalatest.funsuite.AnyFunSuite
 
 class SortMergeJoinTest extends AnyFunSuite {
 
-  private val left = DataFrame.fromSeq(Seq(("a", 1), ("b", 2), ("c", 3), ("d", 4), ("e", 5), ("f", 6)))
+  private val left = DataFrame.fromSeq(Seq(("b", 2), ("a", 1), ("d", 4), ("c", 3), ("e", 5), ("f", 6)))
   private val right = DataFrame.fromSeq(Seq(("a", true), ("b", false), ("f", true), ("f", false), ("x", false)))
 
   test("Inner join") {
@@ -36,6 +36,13 @@ class SortMergeJoinTest extends AnyFunSuite {
       .select($"_0", $"#_0", $"_1", $"#_1").as[(String, String, Int, Boolean)].toSeq
     val expected = Seq(("a", "a", 1, true), ("b", "b", 2, false), ("c", null, 3, false), ("d", null, 4, false),
       ("e", null, 5, false), ("f", "f", 6, true), ("f", "f", 6, false), (null, "x", 0, false))
+    assert(joined == expected)
+  }
+
+  test("Join on pre-sorted DataFrame") {
+    val other = DataFrame.fromSeq(Seq("b", "f", "e"))
+    val joined = left.sortBy($"_0").join(other, $"_0").select($"_0", $"_1").as[(String, Int)].toSeq
+    val expected = Seq(("b", 2), ("e", 5), ("f", 6))
     assert(joined == expected)
   }
 
