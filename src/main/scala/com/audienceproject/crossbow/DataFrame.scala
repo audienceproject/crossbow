@@ -52,12 +52,17 @@ class DataFrame private(private val columnData: Vector[Array[_]], val schema: Sc
    */
   def as[T: ru.TypeTag]: TypedView[T] = {
     val dataType = ru.typeOf[T]
-    if (numColumns == 0) throw new IncorrectTypeException(dataType, AnyType(ru.typeOf[Nothing]))
-    val schemaType =
-      if (numColumns == 1) schema.columns.head.columnType
-      else ProductType(schema.columns.map(_.columnType): _*)
-    if (Types.typecheck(schemaType, dataType)) new TypedView[T]
-    else throw new IncorrectTypeException(dataType, schemaType)
+    schema.columns match {
+      case Seq() => throw new IncorrectTypeException(dataType, AnyType(ru.typeOf[Nothing]))
+      case Seq(col) =>
+        if (Types.typecheck(col.columnType, dataType))
+          new TypedColumnView[T](getColumnData(col.name).asInstanceOf[Array[T]])
+        else throw new IncorrectTypeException(dataType, col.columnType)
+      case cols =>
+        val schemaType = ProductType(cols.map(_.columnType): _*)
+        if (Types.typecheck(schemaType, dataType)) new TypedView[T]
+        else throw new IncorrectTypeException(dataType, schemaType)
+    }
   }
 
   /**
@@ -125,10 +130,32 @@ class DataFrame private(private val columnData: Vector[Array[_]], val schema: Sc
   }
 
   /**
+   * Explode this DataFrame on the given expression, flattening its contents and repeating all other cells on the
+   * row for every element in the sequence. The given [[Expr]] must evaluate to a list type.
+   * Use the 'as' method on [[Expr]] to name the flattened column.
+   *
+   * @param expr the [[Expr]] to explode on
+   * @return new DataFrame
+   */
+  def explode(expr: Expr): DataFrame = {
+    val eval = expr.compile(this).typecheckAs[Seq[_]]
+    val ListType(innerType) = eval.typeOf // This unapply is safe due to typecheck.
+    val nestedCol = fillArray[Seq[_]](0 until rowCount, eval.apply)
+    val reps = nestedCol.map(_.size)
+    val colData = for (i <- 0 until numColumns) yield repeatColumn(columnData(i), schema.columns(i).columnType, reps)
+    val explodedColSchema = expr match {
+      case Expr.Named(newName, _) => Column(newName, innerType)
+      case _ => Column(s"_$numColumns", innerType)
+    }
+    val explodedData = convert(nestedCol.toSeq.flatten, innerType)
+    new DataFrame(colData.toVector :+ explodedData, Schema(schema.columns :+ explodedColSchema))
+  }
+
+  /**
    * Partition this DataFrame into groups, defined by the given set of expressions.
    * The evaluation of each of the 'keyExprs' will appear as a column in the output.
    *
-   * @param keyExprs the list of [[Expr]] that will evaluate to the keys of the groups
+   * @param keyExprs the list of [[com.audienceproject.crossbow.expr.Expr]] that will evaluate to the keys of the groups
    * @return [[GroupedView]] on this DataFrame
    */
   def groupBy(keyExprs: Expr*): GroupedView = new GroupedView(keyExprs)
@@ -280,6 +307,10 @@ class DataFrame private(private val columnData: Vector[Array[_]], val schema: Sc
     override def size: Int = rowCount
   }
 
+  private class TypedColumnView[T] private[DataFrame](columnData: Array[T]) extends TypedView[T] {
+    override def apply(index: Int): T = columnData(index)
+  }
+
   def isEmpty: Boolean = rowCount == 0
 
   def iterator: Iterator[Seq[Any]] = new Iterator[Seq[Any]] {
@@ -297,6 +328,8 @@ class DataFrame private(private val columnData: Vector[Array[_]], val schema: Sc
 
 object DataFrame {
 
+  def empty(): DataFrame = new DataFrame(Vector.empty, Schema())
+
   /**
    * Construct a new DataFrame from a sequence of rows.
    *
@@ -305,7 +338,7 @@ object DataFrame {
    * @return new DataFrame
    */
   def fromSeq[T: ru.TypeTag](data: Seq[T]): DataFrame = {
-    if (data.isEmpty) new DataFrame(Vector.empty, Schema())
+    if (data.isEmpty) empty()
     else {
       val dataType = Types.toInternalType(ru.typeOf[T])
       dataType match {
@@ -344,7 +377,7 @@ object DataFrame {
    * @return new DataFrame
    */
   def unionAll(dataFrames: Seq[DataFrame]): DataFrame = {
-    if (dataFrames.isEmpty) new DataFrame(Vector.empty, Schema())
+    if (dataFrames.isEmpty) empty()
     else {
       val schema = dataFrames.head.schema
       if (!dataFrames.tail.forall(_.schema == schema))

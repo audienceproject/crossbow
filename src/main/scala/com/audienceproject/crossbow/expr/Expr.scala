@@ -38,6 +38,12 @@ private[crossbow] object Expr {
     override def toString: String = columnName
   }
 
+  case class Index() extends Expr {
+    override private[crossbow] def compile(context: DataFrame) = {
+      specialize[Int](identity)
+    }
+  }
+
   case class Literal[T: ru.TypeTag](value: T) extends Expr {
     override private[crossbow] def compile(context: DataFrame) = specialize[T](_ => value)
   }

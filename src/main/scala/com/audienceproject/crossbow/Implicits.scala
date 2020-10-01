@@ -26,6 +26,9 @@ object Implicits {
 
   implicit def tuple6(t: (Expr, Expr, Expr, Expr, Expr, Expr)): Expr = Expr.Tuple(t._1, t._2, t._3, t._4, t._5, t._6)
 
+  // Index function.
+  def index(): Expr = Expr.Index()
+
   // Lambda function.
   def lambda[T: ru.TypeTag, R: ru.TypeTag](f: T => R): Expr => Expr =
     (expr: Expr) => Expr.Lambda(expr, f)

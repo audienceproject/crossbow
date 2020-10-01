@@ -86,6 +86,27 @@ package object crossbow {
     arr
   }
 
+  private[crossbow] def repeatColumn(data: Array[_], ofType: Type, reps: Array[Int]): Array[_] = {
+    ofType match {
+      case IntType => fillRepeatArray[Int](data.asInstanceOf[Array[Int]], reps)
+      case LongType => fillRepeatArray[Long](data.asInstanceOf[Array[Long]], reps)
+      case DoubleType => fillRepeatArray[Double](data.asInstanceOf[Array[Double]], reps)
+      case BooleanType => fillRepeatArray[Boolean](data.asInstanceOf[Array[Boolean]], reps)
+      case _ => fillRepeatArray[Any](data.asInstanceOf[Array[Any]], reps)
+    }
+  }
+
+  private[crossbow] def fillRepeatArray[T: ClassTag](data: Array[T], reps: Array[Int]): Array[T] = {
+    val arr = new Array[T](reps.sum)
+    reps.indices.foldLeft(0) {
+      case (offset, i) =>
+        val next = offset + reps(i)
+        for (j <- offset until next) arr(j) = data(i)
+        next
+    }
+    arr
+  }
+
   private[crossbow] def convert(data: Seq[Any], dataType: Type): Array[_] = {
     dataType match {
       case IntType => data.asInstanceOf[Seq[Int]].toArray

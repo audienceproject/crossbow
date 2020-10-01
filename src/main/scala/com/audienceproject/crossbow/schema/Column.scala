@@ -1,6 +1,6 @@
 package com.audienceproject.crossbow.schema
 
-import com.audienceproject.crossbow.expr.{Type, Types, ru}
+import com.audienceproject.crossbow.expr.{AnyType, Type, Types, ru}
 
 case class Column private[crossbow](name: String, columnType: Type) {
 
@@ -14,5 +14,8 @@ object Column {
 
   def apply[T: ru.TypeTag](columnName: String): Column =
     Column(columnName, Types.toInternalType(ru.typeOf[T]))
+
+  def unspecialized[T: ru.TypeTag](columnName: String): Column =
+    Column(columnName, AnyType(ru.typeOf[T]))
 
 }

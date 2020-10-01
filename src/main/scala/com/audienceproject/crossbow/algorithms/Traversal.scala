@@ -25,7 +25,7 @@ private[crossbow] object Traversal {
           case BinaryExpr(lhs, rhs) => dfs(lhs :: rhs :: tail, result)
           case UnaryExpr(expr) => dfs(expr :: tail, result)
           case Aggregator(expr) => dfs(expr :: tail, result)
-          case Expr.Named(name, expr) => dfs(expr :: tail, result)
+          case Expr.Named(_, expr) => dfs(expr :: tail, result)
           case Expr.Tuple(exprs@_*) => dfs(exprs.toList ++ tail, result)
           case Expr.List(exprs) => dfs(exprs.toList ++ tail, result)
           case lambda: Expr.Lambda[_, _] => dfs(lambda.expr :: tail, result)
