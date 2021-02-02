@@ -175,7 +175,9 @@ class DataFrame private(private val columnData: Vector[Array[_]], val schema: Sc
       val eval = expr.compile(this)
       val ord = Order.getOrdering(eval.typeOf, givenOrderings)
       val indices = Array.tabulate(rowCount)(identity)
-      Sorting.quickSort[Int](indices)((x: Int, y: Int) => ord.compare(eval(x), eval(y)))
+      Sorting.quickSort[Int](indices)(new Ordering[Int] {
+        override def compare(x: Int, y: Int): Int = ord.compare(eval(x), eval(y))
+      })
       slice(indices.toIndexedSeq, if (givenOrderings.isEmpty) Some(expr) else None)
     }
   }
@@ -335,21 +337,22 @@ object DataFrame {
    * @tparam T the type of a row, if this is a [[Product]] type each element will become a separate column
    * @return new DataFrame
    */
-  def fromSeq[T: ru.TypeTag](data: Seq[T]): DataFrame = {
+  def fromSeq[T: ru.TypeTag](data: Seq[T], columnNames: String*): DataFrame = {
 
-      val dataType = Types.toInternalType(ru.typeOf[T])
-      dataType match {
-        case ProductType(elementTypes@_*) =>
-          val tupleData = data.asInstanceOf[Seq[Product]]
-          val columnData = elementTypes.zipWithIndex.map({ case (t, i) => convert(tupleData.map(_.productElement(i)), t) })
-          val columnSchemas = elementTypes.zipWithIndex.map({ case (t, i) => Column(s"_$i", t) })
-          new DataFrame(columnData.toVector, Schema(columnSchemas.toList))
-        case _ =>
-          val col = convert(data, dataType)
-          new DataFrame(Vector(col), Schema(List(new Column("_0", dataType))))
-      }
-
+    val dataType = Types.toInternalType(ru.typeOf[T])
+    val df = dataType match {
+      case ProductType(elementTypes@_*) =>
+        val tupleData = data.asInstanceOf[Seq[Product]]
+        val columnData = elementTypes.zipWithIndex.map({ case (t, i) => convert(tupleData.map(_.productElement(i)), t) })
+        val columnSchemas = elementTypes.zipWithIndex.map({ case (t, i) => Column(s"_$i", t) })
+        new DataFrame(columnData.toVector, Schema(columnSchemas.toList))
+      case _ =>
+        val col = convert(data, dataType)
+        new DataFrame(Vector(col), Schema(List(new Column("_0", dataType))))
+    }
+    if (columnNames.nonEmpty) df.renameColumns(columnNames:_*) else df
   }
+
 
   /**
    * Construct a new DataFrame from a list of columns and a schema.
