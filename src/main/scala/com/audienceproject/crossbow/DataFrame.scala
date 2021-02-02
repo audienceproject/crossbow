@@ -175,9 +175,7 @@ class DataFrame private(private val columnData: Vector[Array[_]], val schema: Sc
       val eval = expr.compile(this)
       val ord = Order.getOrdering(eval.typeOf, givenOrderings)
       val indices = Array.tabulate(rowCount)(identity)
-      Sorting.quickSort[Int](indices)(new Ordering[Int] {
-        override def compare(x: Int, y: Int): Int = ord.compare(eval(x), eval(y))
-      })
+      Sorting.quickSort[Int](indices)((x: Int, y: Int) => ord.compare(eval(x), eval(y)))
       slice(indices.toIndexedSeq, if (givenOrderings.isEmpty) Some(expr) else None)
     }
   }
@@ -338,8 +336,7 @@ object DataFrame {
    * @return new DataFrame
    */
   def fromSeq[T: ru.TypeTag](data: Seq[T]): DataFrame = {
-    if (data.isEmpty) empty()
-    else {
+
       val dataType = Types.toInternalType(ru.typeOf[T])
       dataType match {
         case ProductType(elementTypes@_*) =>
@@ -351,7 +348,7 @@ object DataFrame {
           val col = convert(data, dataType)
           new DataFrame(Vector(col), Schema(List(new Column("_0", dataType))))
       }
-    }
+
   }
 
   /**
