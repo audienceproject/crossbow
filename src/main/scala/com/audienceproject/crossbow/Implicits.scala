@@ -54,7 +54,8 @@ object Implicits {
       }
     }
   implicit class SeqWrapper[T: ru.TypeTag](val seq:Seq[T])  {
-    def toDataframe(columnNames:String*): DataFrame = {
+
+    def toDataFrame(columnNames:String*): DataFrame = {
       DataFrame.fromSeq(seq,columnNames:_*)
     }
   }
