@@ -53,5 +53,10 @@ object Implicits {
         Reducer[T, U](spec, f, seed, Types.toInternalType(ru.typeOf[U]))
       }
     }
+  implicit class SeqWrapper[T: ru.TypeTag](val seq:Seq[T])  {
 
+    def toDataFrame(columnNames:String*): DataFrame = {
+      DataFrame.fromSeq(seq,columnNames:_*)
+    }
+  }
 }
