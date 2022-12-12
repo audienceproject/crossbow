@@ -61,7 +61,7 @@ private[crossbow] object SortMergeJoin {
       }
     }
 
-    if (leftSet.nonEmpty && isLeftJoin) addCartesianProduct(leftSet.head until leftSet.size, Seq(-1))
+    if (leftSet.nonEmpty && isLeftJoin) addCartesianProduct(leftSet.head until leftKey.size, Seq(-1))
     if (rightSet.nonEmpty && isRightJoin) addCartesianProduct(Seq(-1), rightSet.head until rightKey.size)
 
     val leftFinal = left.slice(leftResult.toIndexedSeq)
