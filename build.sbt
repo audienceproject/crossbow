@@ -4,10 +4,10 @@ name := "crossbow"
 
 version := "0.1.5"
 
-scalaVersion := "2.13.3"
+scalaVersion := "2.13.6"
 crossScalaVersions := Seq(scalaVersion.value, "2.12.12", "2.11.12")
 
-scalacOptions += "-deprecation"
+scalacOptions ++= Seq("-deprecation", "-feature", "-language:existentials")
 
 libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value
 libraryDependencies += "org.scalatest" %% "scalatest-funsuite" % "3.2.0" % "test"
@@ -16,7 +16,7 @@ libraryDependencies += "org.scalatest" %% "scalatest-funsuite" % "3.2.0" % "test
  * Maven specific settings for publishing to Maven central.
  */
 publishMavenStyle := true
-publishArtifact in Test := false
+Test / publishArtifact := false
 pomIncludeRepository := { _ => false }
 publishTo := {
   val nexus = "https://oss.sonatype.org/"

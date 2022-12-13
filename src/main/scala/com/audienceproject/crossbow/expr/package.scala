@@ -24,14 +24,29 @@ package object expr {
 
   case class AnyType(runtimeType: ru.Type) extends Type {
     override def toString: String = runtimeType.toString
+
+    override def equals(obj: Any): Boolean = obj match {
+      case AnyType(otherRuntimeType) => runtimeType =:= otherRuntimeType
+      case _ => false
+    }
   }
 
   case class ProductType(elementTypes: Type*) extends Type {
     override def toString: String = s"(${elementTypes.mkString(",")})"
+
+    override def equals(obj: Any): Boolean = obj match {
+      case ProductType(otherElementTypes@_*) => elementTypes == otherElementTypes
+      case _ => false
+    }
   }
 
   case class ListType(elementType: Type) extends Type {
     override def toString: String = s"List($elementType)"
+
+    override def equals(obj: Any): Boolean = obj match {
+      case ListType(otherElementType) => elementType == otherElementType
+      case _ => false
+    }
   }
 
 }
