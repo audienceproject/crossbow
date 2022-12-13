@@ -167,20 +167,25 @@ class DataFrame private(private val columnData: Vector[Array[_]], val schema: Sc
    *
    * @param expr           the [[Expr]] to evaluate as a sort key
    * @param givenOrderings explicit [[Order]] to use on the sort key, or list of [[Order]] if the key is a tuple
+   * @param stable         whether the sorting should be stable or not - quicksort is used if not, else mergesort
    * @return new DataFrame
    */
-  def sortBy(expr: Expr, givenOrderings: Order*): DataFrame = {
+  def sortBy(expr: Expr, givenOrderings: Seq[Order] = Seq.empty, stable: Boolean = false): DataFrame = {
     if (sortKey.contains(expr) && givenOrderings.isEmpty) this
     else {
       val eval = expr.compile(this)
       val ord = Order.getOrdering(eval.typeOf, givenOrderings)
       val indices = Array.tabulate(rowCount)(identity)
-      Sorting.quickSort[Int](indices)(new Ordering[Int] {
+      val comparator = new Ordering[Int] {
         override def compare(x: Int, y: Int): Int = ord.compare(eval(x), eval(y))
-      })
+      }
+      if (stable) Sorting.stableSort[Int](indices)(comparator)
+      else Sorting.quickSort[Int](indices)(comparator)
       slice(indices.toIndexedSeq, if (givenOrderings.isEmpty) Some(expr) else None)
     }
   }
+
+  def sortBy(expr: Expr, givenOrderings: Order*): DataFrame = sortBy(expr, Seq(givenOrderings: _*))
 
   /**
    * Join this DataFrame on another DataFrame, with the key evaluated by 'joinExpr'.
@@ -350,7 +355,7 @@ object DataFrame {
         val col = convert(data, dataType)
         new DataFrame(Vector(col), Schema(List(new Column("_0", dataType))))
     }
-    if (columnNames.nonEmpty) df.renameColumns(columnNames:_*) else df
+    if (columnNames.nonEmpty) df.renameColumns(columnNames: _*) else df
   }
 
 
