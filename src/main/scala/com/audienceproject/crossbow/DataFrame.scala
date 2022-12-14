@@ -176,11 +176,11 @@ class DataFrame private(private val columnData: Vector[Array[_]], val schema: Sc
       val eval = expr.compile(this)
       val ord = Order.getOrdering(eval.typeOf, givenOrderings)
       val indices = Array.tabulate(rowCount)(identity)
-      val comparator = new Ordering[Int] {
+      implicit val comparator: Ordering[Int] = new Ordering[Int] {
         override def compare(x: Int, y: Int): Int = ord.compare(eval(x), eval(y))
       }
-      if (stable) Sorting.stableSort[Int](indices)(comparator)
-      else Sorting.quickSort[Int](indices)(comparator)
+      if (stable) Sorting.stableSort[Int](indices)
+      else Sorting.quickSort[Int](indices)
       slice(indices.toIndexedSeq, if (givenOrderings.isEmpty) Some(expr) else None)
     }
   }
