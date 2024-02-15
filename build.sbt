@@ -2,15 +2,13 @@ organization := "com.audienceproject"
 
 name := "crossbow"
 
-version := "0.1.6"
+version := "0.2.0"
 
-scalaVersion := "2.13.6"
-crossScalaVersions := Seq(scalaVersion.value, "2.12.12", "2.11.12")
+scalaVersion := "3.3.1"
 
-scalacOptions ++= Seq("-deprecation", "-feature", "-language:existentials")
+scalacOptions ++= Seq("-deprecation", "-feature")
 
-libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value
-libraryDependencies += "org.scalatest" %% "scalatest-funsuite" % "3.2.0" % "test"
+libraryDependencies += "org.scalatest" %% "scalatest-funsuite" % "3.2.17" % "test"
 
 /**
  * Maven specific settings for publishing to Maven central.

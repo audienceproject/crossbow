@@ -1,22 +1,13 @@
 package com.audienceproject.crossbow.expr
 
-trait BaseOps {
+import scala.annotation.targetName
 
-  self: Expr =>
+extension (x: Expr)
 
-  def ===(other: Expr): Expr = BaseOps.EqualTo(this, other)
+  @targetName("equals")
+  def ===(y: Expr): Expr = Expr.Binary[Any, Any, Boolean](x, y, _ == _)
 
-  def =!=(other: Expr): Expr = BaseOps.EqualTo(this, other).not()
+  @targetName("notEquals")
+  def =!=(y: Expr): Expr = (x === y).not
 
-  def as(name: String): Expr = Expr.Named(name, this)
-
-}
-
-private[crossbow] object BaseOps {
-
-  case class EqualTo(lhs: Expr, rhs: Expr) extends BinaryExpr(lhs, rhs) {
-    override def typeSpec(lhsOperand: Specialized[_], rhsOperand: Specialized[_]): Specialized[_] =
-      specialize[Any, Any, Boolean](lhsOperand, rhsOperand, _ == _)
-  }
-
-}
+  def as(name: String): Expr = Expr.Named(name, x)

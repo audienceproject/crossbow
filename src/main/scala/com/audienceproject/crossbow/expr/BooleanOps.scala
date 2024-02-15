@@ -2,40 +2,20 @@ package com.audienceproject.crossbow.expr
 
 import com.audienceproject.crossbow.exceptions.InvalidExpressionException
 
-trait BooleanOps {
+import scala.annotation.targetName
 
-  self: Expr =>
+extension (x: Expr)
 
-  def not(): Expr = BooleanOps.Not(this)
+  def not: Expr = x.typeOf match
+    case RuntimeType.Boolean => Expr.Unary[Boolean, Boolean](x, !_)
+    case _ => throw new InvalidExpressionException("not", x)
 
-  def &&(other: Expr): Expr = BooleanOps.And(this, other)
+  @targetName("and")
+  def &&(y: Expr): Expr = (x.typeOf, y.typeOf) match
+    case (RuntimeType.Boolean, RuntimeType.Boolean) => Expr.Binary[Boolean, Boolean, Boolean](x, y, _ && _)
+    case _ => throw new InvalidExpressionException("and", x, y)
 
-  def ||(other: Expr): Expr = BooleanOps.Or(this, other)
-
-}
-
-private[crossbow] object BooleanOps {
-
-  case class Not(expr: Expr) extends UnaryExpr(expr) {
-    override def typeSpec(operand: Specialized[_]): Specialized[Boolean] =
-      if (operand.typeOf == BooleanType) specialize[Boolean, Boolean](operand, !_)
-      else throw new InvalidExpressionException("Not", operand.typeOf)
-  }
-
-  case class And(lhs: Expr, rhs: Expr) extends BinaryExpr(lhs, rhs) {
-    override def typeSpec(lhsOperand: Specialized[_], rhsOperand: Specialized[_]): Specialized[Boolean] =
-      (lhsOperand.typeOf, rhsOperand.typeOf) match {
-        case (BooleanType, BooleanType) => specialize[Boolean, Boolean, Boolean](lhsOperand, rhsOperand, _ && _)
-        case _ => throw new InvalidExpressionException("And", lhsOperand.typeOf, rhsOperand.typeOf)
-      }
-  }
-
-  case class Or(lhs: Expr, rhs: Expr) extends BinaryExpr(lhs, rhs) {
-    override def typeSpec(lhsOperand: Specialized[_], rhsOperand: Specialized[_]): Specialized[Boolean] =
-      (lhsOperand.typeOf, rhsOperand.typeOf) match {
-        case (BooleanType, BooleanType) => specialize[Boolean, Boolean, Boolean](lhsOperand, rhsOperand, _ || _)
-        case _ => throw new InvalidExpressionException("Or", lhsOperand.typeOf, rhsOperand.typeOf)
-      }
-  }
-
-}
+  @targetName("or")
+  def ||(y: Expr): Expr = (x.typeOf, y.typeOf) match
+    case (RuntimeType.Boolean, RuntimeType.Boolean) => Expr.Binary[Boolean, Boolean, Boolean](x, y, _ || _)
+    case _ => throw new InvalidExpressionException("or", x, y)

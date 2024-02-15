@@ -1,21 +1,14 @@
 package com.audienceproject.crossbow.schema
 
-import com.audienceproject.crossbow.expr.{AnyType, Type, Types, ru}
+import com.audienceproject.crossbow.expr.{RuntimeType, TypeTag}
 
-case class Column private[crossbow](name: String, columnType: Type) {
+case class Column private[crossbow](name: String, columnType: RuntimeType):
 
   def renamed(newName: String): Column = Column(newName, columnType)
 
   override def toString: String = s"$name: $columnType"
 
-}
+object Column:
 
-object Column {
-
-  def apply[T: ru.TypeTag](columnName: String): Column =
-    Column(columnName, Types.toInternalType(ru.typeOf[T]))
-
-  def unspecialized[T: ru.TypeTag](columnName: String): Column =
-    Column(columnName, AnyType(ru.typeOf[T]))
-
-}
+  def apply[T: TypeTag](columnName: String): Column =
+    Column(columnName, summon[TypeTag[T]].runtimeType)

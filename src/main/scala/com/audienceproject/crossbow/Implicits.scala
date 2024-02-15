@@ -1,62 +1,44 @@
 package com.audienceproject.crossbow
 
-import com.audienceproject.crossbow.expr.Aggregator.Reducer
-import com.audienceproject.crossbow.expr._
+import com.audienceproject.crossbow.exceptions.InvalidExpressionException
+import com.audienceproject.crossbow.expr.*
 
 import scala.language.implicitConversions
 
 object Implicits {
 
+  import expr.typeTag
+
   // Column expression.
-  implicit class ColumnByName(val sc: StringContext) extends AnyVal {
-    def $(args: Any*): Expr = Expr.Cell(sc.s(args: _*))
-  }
+  extension (sc: StringContext)
+    def $(args: Any*): DataFrame ?=> Expr = Expr.Cell(sc.s(args: _*))
 
   // Literal value.
-  implicit def lit[T: ru.TypeTag](value: T): Expr = Expr.Literal(value)
-
-  // Tuples.
-  implicit def tuple2(t: (Expr, Expr)): Expr = Expr.Tuple(t._1, t._2)
-
-  implicit def tuple3(t: (Expr, Expr, Expr)): Expr = Expr.Tuple(t._1, t._2, t._3)
-
-  implicit def tuple4(t: (Expr, Expr, Expr, Expr)): Expr = Expr.Tuple(t._1, t._2, t._3, t._4)
-
-  implicit def tuple5(t: (Expr, Expr, Expr, Expr, Expr)): Expr = Expr.Tuple(t._1, t._2, t._3, t._4, t._5)
-
-  implicit def tuple6(t: (Expr, Expr, Expr, Expr, Expr, Expr)): Expr = Expr.Tuple(t._1, t._2, t._3, t._4, t._5, t._6)
+  implicit def lit[T](value: T): Expr = Expr.Literal(value)
 
   // Index function.
-  def index(): Expr = Expr.Index()
+  def index(): DataFrame ?=> Expr = Expr.Index()
 
   // Lambda function.
-  def lambda[T: ru.TypeTag, R: ru.TypeTag](f: T => R): Expr => Expr =
-    (expr: Expr) => Expr.Lambda(expr, f)
+  def lambda[T, R](f: T => R): Expr => Expr =
+    (expr: Expr) => Expr.Unary(expr, f)
 
   // Sequence of values.
   def seq(exprs: Expr*): Expr = Expr.List(exprs)
 
   // Aggregators.
-  def sum(expr: Expr): Aggregator = Aggregator.Sum(expr)
+  def sum(expr: Expr): Expr = expr.typeOf match
+    case RuntimeType.Int => Expr.Aggregate[Int, Int](expr, _ + _, 0)
+    case RuntimeType.Long => Expr.Aggregate[Long, Long](expr, _ + _, 0L)
+    case RuntimeType.Double => Expr.Aggregate[Double, Double](expr, _ + _, 0d)
+    case _ => throw new InvalidExpressionException("sum", expr)
 
-  def count(expr: Expr): Aggregator = Aggregator.Count(expr)
+  def count(): Expr = Expr.Aggregate[Any, Int](lit(1), (_, x) => x + 1, 0)
 
-  def collect(expr: Expr): Aggregator = Aggregator.Collect(expr)
+  def collect(expr: Expr): Expr = Expr.Aggregate[Any, Seq[Any]](expr, (e, seq) => seq :+ e, Vector.empty)
 
-  def one(expr: Expr): Aggregator = Aggregator.OneOf(expr)
+  def one(expr: Expr): Expr = Expr.Aggregate[Any, Any](expr, (elem, _) => elem, null)
 
   // Custom aggregator.
-  def reducer[T: ru.TypeTag, U: ru.TypeTag](seed: U)(f: (T, U) => U): Expr => Aggregator =
-    new Aggregator(_) {
-      override protected def typeSpec(op: Specialized[_]): Reducer[_, _] = {
-        val spec = op.typecheckAs[T]
-        Reducer[T, U](spec, f, seed, Types.toInternalType(ru.typeOf[U]))
-      }
-    }
-  implicit class SeqWrapper[T: ru.TypeTag](val seq:Seq[T])  {
-
-    def toDataFrame(columnNames:String*): DataFrame = {
-      DataFrame.fromSeq(seq,columnNames:_*)
-    }
-  }
+  def reducer[T, U](seed: U)(f: (T, U) => U): Expr => Expr = Expr.Aggregate[T, U](_, f, seed)
 }

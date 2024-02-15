@@ -2,13 +2,16 @@ package com.audienceproject.crossbow
 
 import com.audienceproject.crossbow.algorithms.{GroupBy, SortMergeJoin}
 import com.audienceproject.crossbow.exceptions.{IncorrectTypeException, JoinException}
-import com.audienceproject.crossbow.expr._
+import com.audienceproject.crossbow.expr.*
 import com.audienceproject.crossbow.schema.{Column, Schema}
 
 import scala.util.Sorting
 
-class DataFrame private(private val columnData: Vector[Array[_]], val schema: Schema,
-                        private val sortKey: Option[Expr] = None) {
+class DataFrame private(
+  private val columnData: Vector[Array[_]], val schema: Schema,
+  private val sortKey: Option[Expr] = None) {
+
+  import expr.typeTag
 
   val rowCount: Int = if (columnData.isEmpty) 0 else columnData.head.length
   val numColumns: Int = columnData.size
@@ -17,11 +20,11 @@ class DataFrame private(private val columnData: Vector[Array[_]], val schema: Sc
    * Retrieve a single row by index.
    *
    * @param index row index
-   * @return row as a sequence of values
+   * @return row as a [[Tuple]]
    */
-  def apply(index: Int): Seq[Any] =
-    if (isEmpty) Seq.empty
-    else columnData.map(_ (index))
+  def apply(index: Int): Tuple =
+    columnData.foldRight(EmptyTuple: Tuple):
+      (data, tup) => data(index) *: tup
 
   /**
    * Retrieve a subset of rows from this DataFrame based on range of indices.
@@ -29,7 +32,8 @@ class DataFrame private(private val columnData: Vector[Array[_]], val schema: Sc
    * @param range range of row indices to retrieve
    * @return new DataFrame
    */
-  def apply(range: Range): DataFrame = slice(range, sortKey)
+  def apply(range: Range): DataFrame =
+    slice(range, sortKey)
 
   /**
    * Select a subset of columns from this DataFrame.
@@ -37,10 +41,8 @@ class DataFrame private(private val columnData: Vector[Array[_]], val schema: Sc
    * @param columnNames names of columns to select
    * @return new DataFrame
    */
-  def apply(columnNames: String*): DataFrame = {
-    val colExprs = columnNames.map(Expr.Cell)
-    select(colExprs: _*)
-  }
+  def apply(columnNames: String*): DataFrame =
+    select(columnNames.map(Expr.Cell.apply) *)
 
   /**
    * Typecast this DataFrame to a TypedView of the type parameter 'T'. All columns in this DataFrame will have to be
@@ -50,20 +52,11 @@ class DataFrame private(private val columnData: Vector[Array[_]], val schema: Sc
    * @tparam T the type of a row in this DataFrame
    * @return [[TypedView]] on the contents of this DataFrame
    */
-  def as[T: ru.TypeTag]: TypedView[T] = {
-    val dataType = ru.typeOf[T]
-    schema.columns match {
-      case Seq() => throw new IncorrectTypeException(dataType, AnyType(ru.typeOf[Nothing]))
-      case Seq(col) =>
-        if (Types.typecheck(col.columnType, dataType))
-          new TypedColumnView[T](getColumnData(col.name).asInstanceOf[Array[T]])
-        else throw new IncorrectTypeException(dataType, col.columnType)
-      case cols =>
-        val schemaType = ProductType(cols.map(_.columnType): _*)
-        if (Types.typecheck(schemaType, dataType)) new TypedView[T]
-        else throw new IncorrectTypeException(dataType, schemaType)
-    }
-  }
+  def as[T <: Tuple : TypeTag]: TypedView[T] =
+    val schemaType = RuntimeType.Product(schema.columns.map(_.columnType): _*)
+    val expectedType = summon[TypeTag[T]].runtimeType
+    if (expectedType == schemaType) new TypedView[T]
+    else throw new IncorrectTypeException(expectedType, schemaType)
 
   /**
    * Add a column to the DataFrame, evaluating to 'expr' at each individual row index.
@@ -73,11 +66,10 @@ class DataFrame private(private val columnData: Vector[Array[_]], val schema: Sc
    * @return new DataFrame
    */
   def addColumn(expr: Expr): DataFrame = {
-    val eval = expr.compile(this)
-    val newCol = sliceColumn(eval, 0 until rowCount)
+    val newCol = sliceColumn(expr.eval, expr.typeOf, 0 until rowCount)
     val newColSchema = expr match {
-      case Expr.Named(columnName, _) => Column(columnName, eval.typeOf)
-      case _ => Column(s"_$numColumns", eval.typeOf)
+      case Expr.Named(columnName, _) => Column(columnName, expr.typeOf)
+      case _ => Column(s"_$numColumns", expr.typeOf)
     }
     new DataFrame(columnData :+ newCol, schema.add(newColSchema))
   }
@@ -102,17 +94,17 @@ class DataFrame private(private val columnData: Vector[Array[_]], val schema: Sc
    * @param exprs the list of [[Expr]] to evaluate as a new DataFrame
    * @return new DataFrame
    */
-  def select(exprs: Expr*): DataFrame = {
+  def select(exprs: DataFrame ?=> Expr*): DataFrame = {
+    given DataFrame = this
     val (colData, colSchemas) = exprs.zipWithIndex.map({
       case (Expr.Named(newName, Expr.Cell(colName)), _) => (getColumnData(colName), schema.get(colName).renamed(newName))
       case (Expr.Cell(colName), _) => (getColumnData(colName), schema.get(colName))
       case (expr, i) =>
-        val eval = expr.compile(this)
         val newColSchema = expr match {
-          case Expr.Named(columnName, _) => new Column(columnName, eval.typeOf)
-          case _ => new Column(s"_$i", eval.typeOf)
+          case Expr.Named(columnName, _) => new Column(columnName, expr.typeOf)
+          case _ => new Column(s"_$i", expr.typeOf)
         }
-        (sliceColumn(eval, 0 until rowCount), newColSchema)
+        (sliceColumn(expr.eval, expr.typeOf, 0 until rowCount), newColSchema)
     }).unzip[Array[_], Column](p => (p._1, p._2))
     new DataFrame(colData.toVector, Schema(colSchemas))
   }
@@ -124,7 +116,7 @@ class DataFrame private(private val columnData: Vector[Array[_]], val schema: Sc
    * @return new DataFrame
    */
   def filter(expr: Expr): DataFrame = {
-    val eval = expr.compile(this).typecheckAs[Boolean]
+    val eval = expr.typecheckAs[Boolean]
     val indices = for (i <- 0 until rowCount if eval(i)) yield i
     slice(indices, sortKey)
   }
@@ -138,8 +130,8 @@ class DataFrame private(private val columnData: Vector[Array[_]], val schema: Sc
    * @return new DataFrame
    */
   def explode(expr: Expr): DataFrame = {
-    val eval = expr.compile(this).typecheckAs[Seq[_]]
-    val ListType(innerType) = eval.typeOf // This unapply is safe due to typecheck.
+    val eval = expr.typecheckAs[Seq[_]]
+    val RuntimeType.List(innerType) = expr.typeOf: @unchecked // This unapply is safe due to typecheck.
     val nestedCol = fillArray[Seq[_]](0 until rowCount, eval.apply)
     val reps = nestedCol.map(_.size)
     val colData = for (i <- 0 until numColumns) yield repeatColumn(columnData(i), schema.columns(i).columnType, reps)
@@ -158,7 +150,8 @@ class DataFrame private(private val columnData: Vector[Array[_]], val schema: Sc
    * @param keyExprs the list of [[com.audienceproject.crossbow.expr.Expr]] that will evaluate to the keys of the groups
    * @return [[GroupedView]] on this DataFrame
    */
-  def groupBy(keyExprs: Expr*): GroupedView = new GroupedView(keyExprs)
+  def groupBy(keyExprs: DataFrame ?=> Expr*): GroupedView =
+    new GroupedView(keyExprs)
 
   /**
    * Sort this DataFrame by the evaluation of 'expr'. If a natural ordering exists on this value, it will be used.
@@ -173,19 +166,17 @@ class DataFrame private(private val columnData: Vector[Array[_]], val schema: Sc
   def sortBy(expr: Expr, givenOrderings: Seq[Order] = Seq.empty, stable: Boolean = false): DataFrame = {
     if (sortKey.contains(expr) && givenOrderings.isEmpty) this
     else {
-      val eval = expr.compile(this)
-      val ord = Order.getOrdering(eval.typeOf, givenOrderings)
+      val ord = Order.getOrdering(expr.typeOf, givenOrderings)
       val indices = Array.tabulate(rowCount)(identity)
-      implicit val comparator: Ordering[Int] = new Ordering[Int] {
-        override def compare(x: Int, y: Int): Int = ord.compare(eval(x), eval(y))
-      }
+      given Ordering[Int] = (x: Int, y: Int) => ord.compare(expr.eval(x), expr.eval(y))
       if (stable) Sorting.stableSort[Int](indices)
       else Sorting.quickSort[Int](indices)
       slice(indices.toIndexedSeq, if (givenOrderings.isEmpty) Some(expr) else None)
     }
   }
 
-  def sortBy(expr: Expr, givenOrderings: Order*): DataFrame = sortBy(expr, Seq(givenOrderings: _*))
+  def sortBy(expr: Expr, givenOrderings: Order*): DataFrame =
+    sortBy(expr, Seq(givenOrderings: _*))
 
   /**
    * Join this DataFrame on another DataFrame, with the key evaluated by 'joinExpr'.
@@ -198,11 +189,12 @@ class DataFrame private(private val columnData: Vector[Array[_]], val schema: Sc
    * @param joinType [[JoinType]] as one of Inner, FullOuter, LeftOuter or RightOuter
    * @return new DataFrame
    */
-  def join(other: DataFrame, joinExpr: Expr, joinType: JoinType = JoinType.Inner): DataFrame = {
-    val internalType = joinExpr.compile(this).typeOf
-    if (internalType != joinExpr.compile(other).typeOf) throw new JoinException(joinExpr)
-    val ordering = Order.getOrdering(internalType)
-    SortMergeJoin(this.sortBy(joinExpr), other.sortBy(joinExpr), joinExpr, joinType, ordering)
+  def join(other: DataFrame, joinExpr: DataFrame ?=> Expr, joinType: JoinType = JoinType.Inner): DataFrame = {
+    val left = joinExpr(using this)
+    val right = joinExpr(using other)
+    if (left.typeOf != right.typeOf) throw new JoinException(left)
+    val ordering = Order.getOrdering(left.typeOf)
+    SortMergeJoin(this.sortBy(left), other.sortBy(right), joinExpr, joinType, ordering)
   }
 
   /**
@@ -263,18 +255,18 @@ class DataFrame private(private val columnData: Vector[Array[_]], val schema: Sc
 
   private[crossbow] def slice(indices: IndexedSeq[Int], slicedSortKey: Option[Expr] = None): DataFrame = {
     val newData = schema.columns.map(col => {
-      val eval = Expr.Cell(col.name).compile(this)
-      sliceColumn(eval, indices)
+      val oldData = getColumnData(col.name)
+      sliceColumn(oldData, col.columnType, indices)
     })
     new DataFrame(newData.toVector, schema, slicedSortKey)
   }
 
-  private[crossbow] def getColumnData(columnName: String): Array[_] = {
+  private[crossbow] def getColumnData(columnName: String): Array[?] = {
     val columnIndex = schema.indexOf(columnName)
     columnData(columnIndex)
   }
 
-  class GroupedView private[DataFrame](keyExprs: Seq[Expr]) {
+  class GroupedView private[DataFrame](keyExprs: Seq[DataFrame ?=> Expr]) {
     /**
      * Aggregate this GroupedView to a new DataFrame, evaluated by the list of aggregation expressions.
      * An aggregation expression can be any expression, but it must contain [[Aggregator]] expressions instead
@@ -285,19 +277,19 @@ class DataFrame private(private val columnData: Vector[Array[_]], val schema: Sc
      * @param aggExprs the list of [[Expr]] used to aggregate the values of the groups
      * @return new DataFrame
      */
-    def agg(aggExprs: Expr*): DataFrame = GroupBy(DataFrame.this, keyExprs, aggExprs)
+    def agg(aggExprs: DataFrame ?=> Expr*): DataFrame =
+      given DataFrame = DataFrame.this
+      GroupBy(DataFrame.this, keyExprs.map(x => x), aggExprs.map(x => x))
   }
 
-  class TypedView[T] private[DataFrame]() extends Iterable[T] {
-    private implicit val t2Tuple: Seq[Any] => T = toTuple[T](numColumns)
-
+  class TypedView[T <: Tuple] private[DataFrame] extends Iterable[T] {
     /**
      * Retrieve a single row by index.
      *
      * @param index row index
      * @return row as a value of type 'T'
      */
-    def apply(index: Int): T = DataFrame.this (index)
+    def apply(index: Int): T = DataFrame.this.apply(index).asInstanceOf[T]
 
     /**
      * Retrieve a subset of rows from this view based on range of indices.
@@ -312,18 +304,14 @@ class DataFrame private(private val columnData: Vector[Array[_]], val schema: Sc
     override def size: Int = rowCount
   }
 
-  private class TypedColumnView[T] private[DataFrame](columnData: Array[T]) extends TypedView[T] {
-    override def apply(index: Int): T = columnData(index)
-  }
-
   def isEmpty: Boolean = rowCount == 0
 
-  def iterator: Iterator[Seq[Any]] = new Iterator[Seq[Any]] {
+  def iterator: Iterator[Tuple] = new Iterator[Tuple] {
     private var pos = -1
 
     override def hasNext: Boolean = pos < rowCount - 1
 
-    override def next(): Seq[Any] = {
+    override def next(): Tuple = {
       pos += 1
       DataFrame.this (pos)
     }
@@ -342,11 +330,10 @@ object DataFrame {
    * @tparam T the type of a row, if this is a [[Product]] type each element will become a separate column
    * @return new DataFrame
    */
-  def fromSeq[T: ru.TypeTag](data: Seq[T], columnNames: String*): DataFrame = {
-
-    val dataType = Types.toInternalType(ru.typeOf[T])
-    val df = dataType match {
-      case ProductType(elementTypes@_*) =>
+  def fromSeq[T: TypeTag](data: Seq[T], schema: Schema): DataFrame = {
+    val dataType = summon[TypeTag[T]].runtimeType
+    dataType match
+      case RuntimeType.Product(elementTypes*) =>
         val tupleData = data.asInstanceOf[Seq[Product]]
         val columnData = elementTypes.zipWithIndex.map({ case (t, i) => convert(tupleData.map(_.productElement(i)), t) })
         val columnSchemas = elementTypes.zipWithIndex.map({ case (t, i) => Column(s"_$i", t) })
@@ -354,10 +341,12 @@ object DataFrame {
       case _ =>
         val col = convert(data, dataType)
         new DataFrame(Vector(col), Schema(List(new Column("_0", dataType))))
-    }
-    if (columnNames.nonEmpty) df.renameColumns(columnNames: _*) else df
   }
 
+  inline def fromSeq[T: TypeTag](data: Seq[T]): DataFrame =
+    val dataType = summon[TypeTag[T]].runtimeType
+    val schema = Schema(Seq.empty)
+    fromSeq(data, schema)
 
   /**
    * Construct a new DataFrame from a list of columns and a schema.

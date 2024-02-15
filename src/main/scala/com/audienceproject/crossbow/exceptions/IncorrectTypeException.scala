@@ -1,6 +1,6 @@
 package com.audienceproject.crossbow.exceptions
 
-import com.audienceproject.crossbow.expr.{Type, ru}
+import com.audienceproject.crossbow.expr.RuntimeType
 
-class IncorrectTypeException(expected: ru.Type, actual: Type)
+class IncorrectTypeException(expected: RuntimeType, actual: RuntimeType)
   extends RuntimeException(s"Expected $expected, but Expr type was $actual")
