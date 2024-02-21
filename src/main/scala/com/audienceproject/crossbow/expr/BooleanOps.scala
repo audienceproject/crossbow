@@ -4,7 +4,9 @@ import com.audienceproject.crossbow.exceptions.InvalidExpressionException
 
 import scala.annotation.targetName
 
-extension (x: Expr)
+trait BooleanOps:
+
+  x: Expr =>
 
   def not: Expr = x.typeOf match
     case RuntimeType.Boolean => Expr.Unary[Boolean, Boolean](x, !_)

@@ -13,20 +13,22 @@ The library is available through Maven Central.
 SBT style dependency: `"com.audienceproject" %% "crossbow" % "latest"`
 
 # API
+
 ```scala
-import com.audienceproject.crossbow.DataFrame
-import com.audienceproject.crossbow.Implicits._
+import com.audienceproject.crossbow.*
 
 val data = Seq(("a", 1), ("b", 2), ("c", 3))
 val df = DataFrame.fromSeq(data)
 
 df.printSchema()
+
 /**
  * _0: String
  * _1: int
  */
 
 df.as[(String, Int)].foreach(println)
+
 /**
  * ("a", 1)
  * ("b", 2)

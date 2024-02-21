@@ -2,7 +2,9 @@ package com.audienceproject.crossbow.expr
 
 import scala.annotation.targetName
 
-extension (x: Expr)
+trait BaseOps:
+
+  x: Expr =>
 
   @targetName("equals")
   def ===(y: Expr): Expr = Expr.Binary[Any, Any, Boolean](x, y, _ == _)

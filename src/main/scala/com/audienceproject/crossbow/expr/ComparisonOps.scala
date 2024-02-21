@@ -4,7 +4,9 @@ import com.audienceproject.crossbow.exceptions.InvalidExpressionException
 
 import scala.annotation.targetName
 
-extension (x: Expr)
+trait ComparisonOps:
+
+  x: Expr =>
 
   @targetName("gt")
   def >(y: Expr): Expr = (x.typeOf, y.typeOf) match
@@ -20,7 +22,7 @@ extension (x: Expr)
     case (RuntimeType.Double, RuntimeType.Long) => Expr.Binary[Double, Long, Boolean](x, y, _ > _)
     case (RuntimeType.Double, RuntimeType.Int) => Expr.Binary[Double, Int, Boolean](x, y, _ > _)
     case (RuntimeType.Double, RuntimeType.Double) => Expr.Binary[Double, Double, Boolean](x, y, _ > _)
-    case _ => throw new InvalidExpressionException("gt", x, y)
+    case _ => throw InvalidExpressionException("gt", x, y)
 
   @targetName("lt")
   def <(y: Expr): Expr = y > x

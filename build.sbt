@@ -6,7 +6,7 @@ version := "0.2.0"
 
 scalaVersion := "3.3.1"
 
-scalacOptions ++= Seq("-deprecation", "-feature")
+scalacOptions ++= Seq("-deprecation", "-feature", "-language:implicitConversions")
 
 libraryDependencies += "org.scalatest" %% "scalatest-funsuite" % "3.2.17" % "test"
 

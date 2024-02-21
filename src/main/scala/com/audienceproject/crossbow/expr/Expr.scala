@@ -3,16 +3,14 @@ package com.audienceproject.crossbow.expr
 import com.audienceproject.crossbow.DataFrame
 import com.audienceproject.crossbow.exceptions.{IncorrectTypeException, InvalidExpressionException}
 
-sealed trait Expr:
+sealed trait Expr extends BaseOps, ArithmeticOps, BooleanOps, ComparisonOps:
   private[crossbow] val typeOf: RuntimeType
 
   private[crossbow] def eval(i: Int): Any
 
-  private[crossbow] def as[T]: Int => T = eval.asInstanceOf[Int => T]
-
   private[crossbow] def typecheckAs[T: TypeTag]: Int => T =
     val expectedType = summon[TypeTag[T]].runtimeType
-    if (expectedType == typeOf) as[T]
+    if (expectedType == typeOf) eval.asInstanceOf[Int => T]
     else throw new IncorrectTypeException(expectedType, typeOf)
 
 private[crossbow] object Expr:

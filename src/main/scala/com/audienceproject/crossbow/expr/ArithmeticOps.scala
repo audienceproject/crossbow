@@ -4,7 +4,9 @@ import com.audienceproject.crossbow.exceptions.InvalidExpressionException
 
 import scala.annotation.targetName
 
-extension (x: Expr)
+trait ArithmeticOps:
+
+  x: Expr =>
 
   @targetName("plus")
   def +(y: Expr): Expr = (x.typeOf, y.typeOf) match
