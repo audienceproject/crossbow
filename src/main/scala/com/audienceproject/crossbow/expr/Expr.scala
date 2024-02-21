@@ -53,9 +53,15 @@ private[crossbow] object Expr:
     private[crossbow] def reduce(i: Int, agg: U): U = f(exprEval(i), agg)
     private[crossbow] def copy(newExpr: Expr) = Aggregate(newExpr, f, seed)
 
+  case class Product(exprs: Seq[Expr]) extends Expr:
+    override private[crossbow] val typeOf = RuntimeType.Product(exprs.map(_.typeOf) *)
+    override private[crossbow] def eval(i: Int): Tuple =
+      exprs.foldRight(EmptyTuple: Tuple):
+        (expr, tup) => expr.eval(i) *: tup
+
   case class List(exprs: Seq[Expr]) extends Expr:
     override private[crossbow] val typeOf =
       val types = exprs.map(_.typeOf)
-      if (types.distinct.size > 1) throw new InvalidExpressionException("List", exprs: _*)
+      if (types.distinct.size > 1) throw new InvalidExpressionException("List", exprs *)
       else RuntimeType.List(types.head)
     override private[crossbow] def eval(i: Int): Seq[Any] = exprs.map(_.eval(i))

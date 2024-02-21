@@ -93,7 +93,7 @@ class DataFrame private(
    */
   def select(exprs: DataFrame ?=> Expr*): DataFrame =
     given DataFrame = this
-    val (colData, colSchemas) = exprs.zipWithIndex.map {
+    val (colData, colSchemas) = exprs.map(x => x).zipWithIndex.map {
       case (Expr.Named(newName, Expr.Cell(colName)), _) => (getColumnData(colName), schema.get(colName).renamed(newName))
       case (Expr.Cell(colName), _) => (getColumnData(colName), schema.get(colName))
       case (expr, i) =>

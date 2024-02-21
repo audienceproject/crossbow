@@ -8,7 +8,7 @@ enum JoinType:
 
 // Column expression.
 extension (sc: StringContext)
-  def $(args: Any*): DataFrame ?=> Expr = Expr.Cell(sc.s(args: _*))
+  def $(args: Any*): DataFrame ?=> Expr = Expr.Cell(sc.s(args *))
 
 extension [T: TypeTag](seq: Seq[T])
   def toDataFrame(names: String*): DataFrame =
@@ -28,8 +28,16 @@ given Conversion[String, Expr] = lit[String](_)
 def index(): DataFrame ?=> Expr = Expr.Index()
 
 // Lambda function.
-def lambda[T, R](f: T => R): Expr => Expr =
+def lambda[T: TypeTag, R: TypeTag](f: T => R): Expr => Expr =
   (expr: Expr) => Expr.Unary(expr, f)
+
+// Product type (tuples).
+private def tupleToExprs[T <: Tuple](tup: T): List[Expr] = tup match
+  // TODO: Is there some way to ensure a Tuple of Expr instead of casting?
+  case head *: tail => head.asInstanceOf[Expr] :: tupleToExprs(tail)
+  case EmptyTuple => Nil
+
+given fromTuple[T <: Tuple]: Conversion[T, Expr] = (tup: T) => Expr.Product(tupleToExprs(tup))
 
 // Sequence of values.
 def seq(exprs: Expr*): Expr = Expr.List(exprs)

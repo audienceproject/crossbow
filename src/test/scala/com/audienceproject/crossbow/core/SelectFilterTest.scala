@@ -9,7 +9,6 @@ class SelectFilterTest extends AnyFunSuite:
 
   test("Select named columns"):
     val result = df.select($"k", $"x", $"y" as "newY").schema.columns.map(_.name)
-    df.select($"x" * 2)
     val expected = Seq("k", "x", "newY")
     assert(result == expected)
 
