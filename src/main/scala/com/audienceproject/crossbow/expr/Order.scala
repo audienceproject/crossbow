@@ -1,42 +1,31 @@
 package com.audienceproject.crossbow.expr
 
-import com.audienceproject.crossbow.exceptions.NoOrderingException
+import com.audienceproject.crossbow.exceptions.{IncorrectTypeException, NoOrderingException}
 
-class Order private(private val ord: Ordering[_], private val internalType: RuntimeType)
+enum Order:
+  case Implicit
+  case Explicit[T](private val ordering: Ordering[T], private val onType: RuntimeType)
 
-object Order {
+  private[crossbow] def getOrdering(runtimeType: RuntimeType): Ordering[?] = this match
+    case Order.Implicit => runtimeType match
+      case RuntimeType.Int => Ordering.Int
+      case RuntimeType.Long => Ordering.Long
+      case RuntimeType.Double => Ordering.Double.TotalOrdering
+      case RuntimeType.Boolean => Ordering.Boolean
+      case RuntimeType.String => Ordering.String
+      case RuntimeType.Product(elementTypes*) =>
+        elementTypes.map(getOrdering) match
+          case Seq(o1, o2) => Ordering.Tuple2(o1, o2)
+          case Seq(o1, o2, o3) => Ordering.Tuple3(o1, o2, o3)
+          case Seq(o1, o2, o3, o4) => Ordering.Tuple4(o1, o2, o3, o4)
+          case Seq(o1, o2, o3, o4, o5) => Ordering.Tuple5(o1, o2, o3, o4, o5)
+          case Seq(o1, o2, o3, o4, o5, o6) => Ordering.Tuple6(o1, o2, o3, o4, o5, o6)
+          case _ => throw NoOrderingException(runtimeType)
+      case RuntimeType.List(elementType) => Ordering.Implicits.seqOrdering(getOrdering(elementType))
+      case _ => throw NoOrderingException(runtimeType)
+    case Order.Explicit(ordering, onType) =>
+      if onType.compatible(runtimeType) then ordering
+      else throw IncorrectTypeException(onType, runtimeType)
 
-  def by[T: TypeTag](ord: Ordering[T]): Order = new Order(ord, summon[TypeTag[T]].runtimeType)
-
-  private[crossbow] def getOrdering(internalType: RuntimeType, givens: Seq[Order] = Seq.empty): Ordering[Any] = {
-    givens.find(_.internalType == internalType) match {
-      case Some(explicitOrdering) => explicitOrdering.ord.asInstanceOf[Ordering[Any]]
-      case None =>
-        val implicitOrdering = internalType match {
-          case RuntimeType.Int => Ordering.Int
-          case RuntimeType.Long => Ordering.Long
-          case RuntimeType.Double => DoubleOrdering
-          case RuntimeType.Boolean => Ordering.Boolean
-          case RuntimeType.Product(elementTypes*) =>
-            val tupleTypes = elementTypes.map(getOrdering(_, givens))
-            tupleTypes match {
-              case Seq(o1, o2) => Ordering.Tuple2(o1, o2)
-              case Seq(o1, o2, o3) => Ordering.Tuple3(o1, o2, o3)
-              case Seq(o1, o2, o3, o4) => Ordering.Tuple4(o1, o2, o3, o4)
-              case Seq(o1, o2, o3, o4, o5) => Ordering.Tuple5(o1, o2, o3, o4, o5)
-              case Seq(o1, o2, o3, o4, o5, o6) => Ordering.Tuple6(o1, o2, o3, o4, o5, o6)
-              case _ => throw new NoOrderingException(internalType)
-            }
-          case _: RuntimeType.List => throw new NoOrderingException(internalType)
-          //case AnyType(runtimeType) if runtimeType =:= ru.typeOf[String] => Ordering.String // TODO
-          case _ => throw new NoOrderingException(internalType)
-        }
-        implicitOrdering.asInstanceOf[Ordering[Any]]
-    }
-  }
-
-  private object DoubleOrdering extends Ordering[Double] {
-    override def compare(x: Double, y: Double): Int = java.lang.Double.compare(x, y)
-  }
-
-}
+object Order:
+  def by[T: TypeTag](ord: Ordering[T]): Order = Explicit(ord, summon[TypeTag[T]].runtimeType)

@@ -10,8 +10,8 @@ sealed trait Expr extends BaseOps, ArithmeticOps, BooleanOps, ComparisonOps:
 
   private[crossbow] def typecheckAs[T: TypeTag]: Int => T =
     val expectedType = summon[TypeTag[T]].runtimeType
-    if (expectedType == typeOf) eval.asInstanceOf[Int => T]
-    else throw new IncorrectTypeException(expectedType, typeOf)
+    if expectedType.compatible(typeOf) then eval.asInstanceOf[Int => T]
+    else throw IncorrectTypeException(expectedType, typeOf)
 
 private[crossbow] object Expr:
 

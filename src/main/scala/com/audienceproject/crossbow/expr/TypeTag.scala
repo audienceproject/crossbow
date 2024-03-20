@@ -21,7 +21,7 @@ object TypeTag:
       case '[String] => '{ RuntimeType.String }
       case '[head *: tail] => '{ RuntimeType.Product(${ Expr.ofList(tupleToList[head *: tail]) } *) }
       case '[Seq[t]] => '{ RuntimeType.List(${ getRuntimeTypeImpl[t] }) }
-      case _ => '{ RuntimeType.Any(${ Expr(Type.show[T]) }) }
+      case _ => '{ RuntimeType.Generic(${ Expr(Type.show[T]) }) }
 
   private def tupleToList[T: Type](using Quotes): List[Expr[RuntimeType]] =
     Type.of[T] match

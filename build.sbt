@@ -4,7 +4,7 @@ name := "crossbow"
 
 version := "0.2.0"
 
-scalaVersion := "3.3.1"
+scalaVersion := "3.3.3"
 
 scalacOptions ++= Seq("-deprecation", "-feature", "-language:implicitConversions")
 

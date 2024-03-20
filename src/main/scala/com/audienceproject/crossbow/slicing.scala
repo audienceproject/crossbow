@@ -4,7 +4,7 @@ import com.audienceproject.crossbow.expr.RuntimeType
 
 import scala.reflect.ClassTag
 
-private def sliceColumn(eval: Int => ?, ofType: RuntimeType, indices: IndexedSeq[Int]): Array[_] =
+private def sliceColumn(eval: Int => ?, ofType: RuntimeType, indices: IndexedSeq[Int]): Array[?] =
   ofType match
     case RuntimeType.Int => fillArray[Int](indices, eval.asInstanceOf[Int => Int])
     case RuntimeType.Long => fillArray[Long](indices, eval.asInstanceOf[Int => Long])
@@ -12,7 +12,7 @@ private def sliceColumn(eval: Int => ?, ofType: RuntimeType, indices: IndexedSeq
     case RuntimeType.Boolean => fillArray[Boolean](indices, eval.asInstanceOf[Int => Boolean])
     case _ => fillArray[Any](indices, eval)
 
-private def padColumn(data: Array[_], ofType: RuntimeType, padding: Int): Array[_] =
+private def padColumn(data: Array[?], ofType: RuntimeType, padding: Int): Array[?] =
   ofType match
     case RuntimeType.Int => fillArray[Int](data.indices, data.asInstanceOf[Array[Int]], padding)
     case RuntimeType.Long => fillArray[Long](data.indices, data.asInstanceOf[Array[Long]], padding)
@@ -26,7 +26,7 @@ private def fillArray[T: ClassTag](indices: IndexedSeq[Int], getValue: Int => T,
   for (i <- indices.indices if indices(i) >= 0) arr(i + indexOffset) = getValue(indices(i))
   arr
 
-private def spliceColumns(data: Seq[Array[_]], ofType: RuntimeType): Array[_] =
+private def spliceColumns(data: Seq[Array[?]], ofType: RuntimeType): Array[?] =
   ofType match
     case RuntimeType.Int => fillNArray[Int](data.map(_.asInstanceOf[Array[Int]]))
     case RuntimeType.Long => fillNArray[Long](data.map(_.asInstanceOf[Array[Long]]))
@@ -42,7 +42,7 @@ private def fillNArray[T: ClassTag](nData: Seq[Array[T]]): Array[T] =
       data.length + offset
   arr
 
-private def repeatColumn(data: Array[_], ofType: RuntimeType, reps: Array[Int]): Array[_] =
+private def repeatColumn(data: Array[?], ofType: RuntimeType, reps: Array[Int]): Array[?] =
   ofType match
     case RuntimeType.Int => fillRepeatArray[Int](data.asInstanceOf[Array[Int]], reps)
     case RuntimeType.Long => fillRepeatArray[Long](data.asInstanceOf[Array[Long]], reps)
@@ -59,7 +59,7 @@ private def fillRepeatArray[T: ClassTag](data: Array[T], reps: Array[Int]): Arra
       next
   arr
 
-private def convert(data: Seq[Any], dataType: RuntimeType): Array[_] =
+private def convert(data: Seq[Any], dataType: RuntimeType): Array[?] =
   dataType match
     case RuntimeType.Int => data.asInstanceOf[Seq[Int]].toArray
     case RuntimeType.Long => data.asInstanceOf[Seq[Long]].toArray

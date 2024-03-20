@@ -56,4 +56,4 @@ def collect(expr: Expr): Expr = Expr.Aggregate[Any, Seq[Any]](expr, (e, seq) => 
 def one(expr: Expr): Expr = Expr.Aggregate[Any, Any](expr, (elem, _) => elem, null)
 
 // Custom aggregator.
-def reducer[T, U](seed: U)(f: (T, U) => U): Expr => Expr = Expr.Aggregate[T, U](_, f, seed)
+def reducer[T: TypeTag, U: TypeTag](seed: U)(f: (T, U) => U): Expr => Expr = Expr.Aggregate[T, U](_, f, seed)

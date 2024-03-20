@@ -1,14 +1,14 @@
 package com.audienceproject.crossbow
 
 import com.audienceproject.crossbow.algorithms.{GroupBy, SortMergeJoin}
-import com.audienceproject.crossbow.exceptions.{IncorrectTypeException, JoinException}
+import com.audienceproject.crossbow.exceptions.JoinException
 import com.audienceproject.crossbow.expr.*
 import com.audienceproject.crossbow.schema.{Column, Schema}
 
 import scala.util.Sorting
 
 class DataFrame private(
-  private val columnData: Vector[Array[_]], val schema: Schema,
+  private val columnData: Vector[Array[?]], val schema: Schema,
   private val sortKey: Option[Expr] = None):
 
   val rowCount: Int = if (columnData.isEmpty) 0 else columnData.head.length
@@ -51,11 +51,7 @@ class DataFrame private(
    * @tparam T the type of a row in this DataFrame
    * @return [[TypedView]] on the contents of this DataFrame
    */
-  def as[T: TypeTag]: TypedView[T] =
-    val schemaType = schema.toRuntimeType
-    val expectedType = summon[TypeTag[T]].runtimeType
-    if (expectedType == schemaType) TypedView[T]
-    else throw IncorrectTypeException(expectedType, schemaType)
+  def as[T]: TypedView[T] = TypedView[T]
 
   /**
    * Add a column to the DataFrame, evaluating to 'expr' at each individual row index.
@@ -126,9 +122,9 @@ class DataFrame private(
    */
   def explode(expr: DataFrame ?=> Expr): DataFrame =
     given DataFrame = this
-    val eval = expr.typecheckAs[Seq[_]]
+    val eval = expr.typecheckAs[List[?]]
     val RuntimeType.List(innerType) = expr.typeOf: @unchecked // This unapply is safe due to typecheck.
-    val nestedCol = fillArray[Seq[_]](0 until rowCount, eval.apply)
+    val nestedCol = fillArray[Seq[?]](0 until rowCount, eval.apply)
     val reps = nestedCol.map(_.size)
     val colData = for (i <- 0 until numColumns) yield repeatColumn(columnData(i), schema.columns(i).columnType, reps)
     val explodedColSchema = expr match
@@ -150,23 +146,23 @@ class DataFrame private(
   /**
    * Sort this DataFrame by the evaluation of 'expr'. If a natural ordering exists on this value, it will be used.
    * User-defined orderings on other types or for overwriting the natural orderings with an explicit ordering can be
-   * supplied through the 'givenOrderings' argument.
+   * supplied through the 'order' argument in the using clause.
    *
-   * @param expr           the [[Expr]] to evaluate as a sort key
-   * @param givenOrderings explicit [[Order]] to use on the sort key, or list of [[Order]] if the key is a tuple
-   * @param stable         whether the sorting should be stable or not - quicksort is used if not, else mergesort
+   * @param expr   the [[Expr]] to evaluate as a sort key
+   * @param stable whether the sorting should be stable or not - quicksort is used if not, else mergesort
+   * @param order  explicit [[Order]] to use on the sort key
    * @return new DataFrame
    */
-  def sortBy(expr: DataFrame ?=> Expr, givenOrderings: Seq[Order] = Seq.empty, stable: Boolean = false): DataFrame =
+  def sortBy(expr: DataFrame ?=> Expr, stable: Boolean = false)(using order: Order = Order.Implicit): DataFrame =
     given DataFrame = this
-    if (sortKey.contains(expr) && givenOrderings.isEmpty) this
+    if (sortKey.contains(expr) && order == Order.Implicit) this
     else
-      val ord = Order.getOrdering(expr.typeOf, givenOrderings)
       val indices = Array.tabulate(rowCount)(identity)
+      val ord = order.getOrdering(expr.typeOf).asInstanceOf[Ordering[Any]]
       given Ordering[Int] = (x: Int, y: Int) => ord.compare(expr.eval(x), expr.eval(y))
       if (stable) Sorting.stableSort[Int](indices)
       else Sorting.quickSort[Int](indices)
-      slice(indices.toIndexedSeq, if (givenOrderings.isEmpty) Some(expr) else None)
+      slice(indices.toIndexedSeq, Option.when(order == Order.Implicit)(expr))
 
   /**
    * Join this DataFrame on another DataFrame, with the key evaluated by 'joinExpr'.
@@ -183,7 +179,7 @@ class DataFrame private(
     val left = joinExpr(using this)
     val right = joinExpr(using other)
     if (left.typeOf != right.typeOf) throw JoinException(left)
-    val ordering = Order.getOrdering(left.typeOf)
+    val ordering = Order.Implicit.getOrdering(left.typeOf).asInstanceOf[Ordering[Any]]
     SortMergeJoin(this.sortBy(joinExpr), other.sortBy(joinExpr), joinExpr, joinType, ordering)
 
   /**
