@@ -1,6 +1,6 @@
 package com.audienceproject.crossbow
 
-import com.audienceproject.crossbow.exceptions.InvalidExpressionException
+import com.audienceproject.crossbow.exceptions.AggregationException
 import com.audienceproject.crossbow.expr.*
 
 enum JoinType:
@@ -44,16 +44,20 @@ def seq(exprs: Expr*): Expr = Expr.List(exprs)
 
 // Aggregators.
 def sum(expr: Expr): Expr = expr.typeOf match
-  case RuntimeType.Int => Expr.Aggregate[Int, Int](expr, _ + _, 0)
-  case RuntimeType.Long => Expr.Aggregate[Long, Long](expr, _ + _, 0L)
-  case RuntimeType.Double => Expr.Aggregate[Double, Double](expr, _ + _, 0d)
-  case _ => throw new InvalidExpressionException("sum", expr)
+  case RuntimeType.Int => Expr.Aggregate[Int, Int](expr)(_ + _, 0)
+  case RuntimeType.Long => Expr.Aggregate[Long, Long](expr)(_ + _, 0L)
+  case RuntimeType.Double => Expr.Aggregate[Double, Double](expr)(_ + _, 0d)
+  case _ => throw new AggregationException(expr)
 
-def count(): Expr = Expr.Aggregate[Any, Int](lit(1), (_, x) => x + 1, 0)
+def count(): Expr =
+  Expr.Aggregate[Any, Int](lit(1))((_, x) => x + 1, 0, RuntimeType.Int)
 
-def collect(expr: Expr): Expr = Expr.Aggregate[Any, Seq[Any]](expr, (e, seq) => seq :+ e, Vector.empty)
+def collect(expr: Expr): Expr =
+  Expr.Aggregate[Any, Seq[Any]](expr)((e, seq) => seq :+ e, Vector.empty, RuntimeType.List(expr.typeOf))
 
-def one(expr: Expr): Expr = Expr.Aggregate[Any, Any](expr, (elem, _) => elem, null)
+def one(expr: Expr): Expr =
+  Expr.Aggregate[Any, Any](expr)((elem, _) => elem, null)
 
 // Custom aggregator.
-def reducer[T: TypeTag, U: TypeTag](seed: U)(f: (T, U) => U): Expr => Expr = Expr.Aggregate[T, U](_, f, seed)
+def reducer[T: TypeTag, U: TypeTag](seed: U)(f: (T, U) => U): Expr => Expr =
+  Expr.Aggregate[T, U](_)(f, seed, summon[TypeTag[U]].runtimeType)

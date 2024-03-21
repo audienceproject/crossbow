@@ -46,12 +46,12 @@ private[crossbow] object Expr:
     override private[crossbow] def eval(i: Int) = f(lhsEval(i), rhsEval(i))
     private[crossbow] def copy(newLhs: Expr, newRhs: Expr) = Binary(newLhs, newRhs, f)
 
-  case class Aggregate[T: TypeTag, U: TypeTag](expr: Expr, f: (T, U) => U, seed: U) extends Expr:
+  case class Aggregate[T: TypeTag, U](expr: Expr)
+    (f: (T, U) => U, val seed: U, private[crossbow] val typeOf: RuntimeType = expr.typeOf) extends Expr:
     private val exprEval = expr.typecheckAs[T]
-    override private[crossbow] val typeOf = summon[TypeTag[U]].runtimeType
     override private[crossbow] def eval(i: Int) = exprEval(i)
     private[crossbow] def reduce(i: Int, agg: U): U = f(exprEval(i), agg)
-    private[crossbow] def copy(newExpr: Expr) = Aggregate(newExpr, f, seed)
+    private[crossbow] def copy(newExpr: Expr) = Aggregate(newExpr)(f, seed, typeOf)
 
   case class Product(exprs: Seq[Expr]) extends Expr:
     override private[crossbow] val typeOf = RuntimeType.Product(exprs.map(_.typeOf) *)
