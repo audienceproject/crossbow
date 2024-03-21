@@ -42,7 +42,7 @@ class SortMergeJoinTest extends AnyFunSuite:
 
   test("Join on scala.Predef.String and java.lang.String"):
     case class Score(name: String, points: Int)
-    val scores = Seq(Score("abc", 20), Score("def", 40)).map(Score.unapply).toDataFrame("name", "points")
+    val scores = Seq(Score("abc", 20), Score("def", 40)).map(s => (s.name, s.points)).toDataFrame("name", "points")
     val names = Seq("abc", "def").toDataFrame("name")
     val joined = scores.join(names, $"name")
     assert(joined.rowCount == 2)
