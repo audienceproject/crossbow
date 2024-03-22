@@ -2,39 +2,33 @@ package com.audienceproject.crossbow.expr
 
 import com.audienceproject.crossbow.exceptions.InvalidExpressionException
 
-trait ComparisonOps {
+import scala.annotation.targetName
 
-  self: Expr =>
+trait ComparisonOps:
 
-  def >(other: Expr): Expr = ComparisonOps.GreaterThan(this, other)
+  x: Expr =>
 
-  def <(other: Expr): Expr = ComparisonOps.GreaterThan(other, this)
+  @targetName("gt")
+  def >(y: Expr): Expr = (x.typeOf, y.typeOf) match
+    // Long
+    case (RuntimeType.Long, RuntimeType.Long) => Expr.Binary[Long, Long, Boolean](x, y, _ > _)
+    case (RuntimeType.Long, RuntimeType.Int) => Expr.Binary[Long, Int, Boolean](x, y, _ > _)
+    case (RuntimeType.Long, RuntimeType.Double) => Expr.Binary[Long, Double, Boolean](x, y, _ > _)
+    // Int
+    case (RuntimeType.Int, RuntimeType.Long) => Expr.Binary[Int, Long, Boolean](x, y, _ > _)
+    case (RuntimeType.Int, RuntimeType.Int) => Expr.Binary[Int, Int, Boolean](x, y, _ > _)
+    case (RuntimeType.Int, RuntimeType.Double) => Expr.Binary[Int, Double, Boolean](x, y, _ > _)
+    // Double
+    case (RuntimeType.Double, RuntimeType.Long) => Expr.Binary[Double, Long, Boolean](x, y, _ > _)
+    case (RuntimeType.Double, RuntimeType.Int) => Expr.Binary[Double, Int, Boolean](x, y, _ > _)
+    case (RuntimeType.Double, RuntimeType.Double) => Expr.Binary[Double, Double, Boolean](x, y, _ > _)
+    case _ => throw InvalidExpressionException("gt", x, y)
 
-  def >=(other: Expr): Expr = (this < other).not()
+  @targetName("lt")
+  def <(y: Expr): Expr = y > x
 
-  def <=(other: Expr): Expr = (this > other).not()
+  @targetName("gte")
+  def >=(y: Expr): Expr = (x < y).not
 
-}
-
-private[crossbow] object ComparisonOps {
-
-  case class GreaterThan(lhs: Expr, rhs: Expr) extends BinaryExpr(lhs, rhs) {
-    override def typeSpec(lhsOperand: Specialized[_], rhsOperand: Specialized[_]): Specialized[_] =
-      (lhsOperand.typeOf, rhsOperand.typeOf) match {
-        // Long
-        case (LongType, LongType) => specialize[Long, Long, Boolean](lhsOperand, rhsOperand, _ > _)
-        case (LongType, IntType) => specialize[Long, Int, Boolean](lhsOperand, rhsOperand, _ > _)
-        case (LongType, DoubleType) => specialize[Long, Double, Boolean](lhsOperand, rhsOperand, _ > _)
-        // Int
-        case (IntType, LongType) => specialize[Int, Long, Boolean](lhsOperand, rhsOperand, _ > _)
-        case (IntType, IntType) => specialize[Int, Int, Boolean](lhsOperand, rhsOperand, _ > _)
-        case (IntType, DoubleType) => specialize[Int, Double, Boolean](lhsOperand, rhsOperand, _ > _)
-        // Double
-        case (DoubleType, LongType) => specialize[Double, Long, Boolean](lhsOperand, rhsOperand, _ > _)
-        case (DoubleType, IntType) => specialize[Double, Int, Boolean](lhsOperand, rhsOperand, _ > _)
-        case (DoubleType, DoubleType) => specialize[Double, Double, Boolean](lhsOperand, rhsOperand, _ > _)
-        case _ => throw new InvalidExpressionException("GreaterThan", lhsOperand.typeOf, rhsOperand.typeOf)
-      }
-  }
-
-}
+  @targetName("lte")
+  def <=(y: Expr): Expr = (x > y).not

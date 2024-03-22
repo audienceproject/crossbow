@@ -2,139 +2,100 @@ package com.audienceproject.crossbow.expr
 
 import com.audienceproject.crossbow.exceptions.InvalidExpressionException
 
-trait ArithmeticOps {
+import scala.annotation.targetName
 
-  self: Expr =>
+trait ArithmeticOps:
 
-  def +(other: Expr): Expr = ArithmeticOps.Plus(this, other)
+  x: Expr =>
 
-  def -(other: Expr): Expr = ArithmeticOps.Minus(this, other)
+  @targetName("plus")
+  def +(y: Expr): Expr = (x.typeOf, y.typeOf) match
+    // Long
+    case (RuntimeType.Long, RuntimeType.Long) => Expr.Binary[Long, Long, Long](x, y, _ + _)
+    case (RuntimeType.Long, RuntimeType.Int) => Expr.Binary[Long, Int, Long](x, y, _ + _)
+    case (RuntimeType.Int, RuntimeType.Long) => Expr.Binary[Int, Long, Long](x, y, _ + _)
+    // Int
+    case (RuntimeType.Int, RuntimeType.Int) => Expr.Binary[Int, Int, Int](x, y, _ + _)
+    // Double
+    case (RuntimeType.Double, RuntimeType.Double) => Expr.Binary[Double, Double, Double](x, y, _ + _)
+    case (RuntimeType.Double, RuntimeType.Long) => Expr.Binary[Double, Long, Double](x, y, _ + _)
+    case (RuntimeType.Long, RuntimeType.Double) => Expr.Binary[Long, Double, Double](x, y, _ + _)
+    case (RuntimeType.Double, RuntimeType.Int) => Expr.Binary[Double, Int, Double](x, y, _ + _)
+    case (RuntimeType.Int, RuntimeType.Double) => Expr.Binary[Int, Double, Double](x, y, _ + _)
+    case _ => throw new InvalidExpressionException("plus", x, y)
 
-  def *(other: Expr): Expr = ArithmeticOps.Multiply(this, other)
+  @targetName("minus")
+  def -(y: Expr): Expr = (x.typeOf, y.typeOf) match
+    // Long
+    case (RuntimeType.Long, RuntimeType.Long) => Expr.Binary[Long, Long, Long](x, y, _ - _)
+    case (RuntimeType.Long, RuntimeType.Int) => Expr.Binary[Long, Int, Long](x, y, _ - _)
+    case (RuntimeType.Int, RuntimeType.Long) => Expr.Binary[Int, Long, Long](x, y, _ - _)
+    // Int
+    case (RuntimeType.Int, RuntimeType.Int) => Expr.Binary[Int, Int, Int](x, y, _ - _)
+    // Double
+    case (RuntimeType.Double, RuntimeType.Double) => Expr.Binary[Double, Double, Double](x, y, _ - _)
+    case (RuntimeType.Double, RuntimeType.Long) => Expr.Binary[Double, Long, Double](x, y, _ - _)
+    case (RuntimeType.Long, RuntimeType.Double) => Expr.Binary[Long, Double, Double](x, y, _ - _)
+    case (RuntimeType.Double, RuntimeType.Int) => Expr.Binary[Double, Int, Double](x, y, _ - _)
+    case (RuntimeType.Int, RuntimeType.Double) => Expr.Binary[Int, Double, Double](x, y, _ - _)
+    case _ => throw new InvalidExpressionException("minus", x, y)
 
-  def /(other: Expr): Expr = ArithmeticOps.Divide(this, other)
+  @targetName("times")
+  def *(y: Expr): Expr = (x.typeOf, y.typeOf) match
+    // Long
+    case (RuntimeType.Long, RuntimeType.Long) => Expr.Binary[Long, Long, Long](x, y, _ * _)
+    case (RuntimeType.Long, RuntimeType.Int) => Expr.Binary[Long, Int, Long](x, y, _ * _)
+    case (RuntimeType.Int, RuntimeType.Long) => Expr.Binary[Int, Long, Long](x, y, _ * _)
+    // Int
+    case (RuntimeType.Int, RuntimeType.Int) => Expr.Binary[Int, Int, Int](x, y, _ * _)
+    // Double
+    case (RuntimeType.Double, RuntimeType.Double) => Expr.Binary[Double, Double, Double](x, y, _ * _)
+    case (RuntimeType.Double, RuntimeType.Long) => Expr.Binary[Double, Long, Double](x, y, _ * _)
+    case (RuntimeType.Long, RuntimeType.Double) => Expr.Binary[Long, Double, Double](x, y, _ * _)
+    case (RuntimeType.Double, RuntimeType.Int) => Expr.Binary[Double, Int, Double](x, y, _ * _)
+    case (RuntimeType.Int, RuntimeType.Double) => Expr.Binary[Int, Double, Double](x, y, _ * _)
+    case _ => throw new InvalidExpressionException("times", x, y)
 
-  def %(other: Expr): Expr = ArithmeticOps.Mod(this, other)
+  @targetName("div")
+  def /(y: Expr): Expr = (x.typeOf, y.typeOf) match
+    // Long
+    case (RuntimeType.Long, RuntimeType.Long) => Expr.Binary[Long, Long, Long](x, y, _ / _)
+    case (RuntimeType.Long, RuntimeType.Int) => Expr.Binary[Long, Int, Long](x, y, _ / _)
+    case (RuntimeType.Int, RuntimeType.Long) => Expr.Binary[Int, Long, Long](x, y, _ / _)
+    // Int
+    case (RuntimeType.Int, RuntimeType.Int) => Expr.Binary[Int, Int, Int](x, y, _ / _)
+    // Double
+    case (RuntimeType.Double, RuntimeType.Double) => Expr.Binary[Double, Double, Double](x, y, _ / _)
+    case (RuntimeType.Double, RuntimeType.Long) => Expr.Binary[Double, Long, Double](x, y, _ / _)
+    case (RuntimeType.Long, RuntimeType.Double) => Expr.Binary[Long, Double, Double](x, y, _ / _)
+    case (RuntimeType.Double, RuntimeType.Int) => Expr.Binary[Double, Int, Double](x, y, _ / _)
+    case (RuntimeType.Int, RuntimeType.Double) => Expr.Binary[Int, Double, Double](x, y, _ / _)
+    case _ => throw new InvalidExpressionException("div", x, y)
 
-  def abs(): Expr = ArithmeticOps.Abs(this)
+  @targetName("mod")
+  def %(y: Expr): Expr = (x.typeOf, y.typeOf) match
+    // Long
+    case (RuntimeType.Long, RuntimeType.Long) => Expr.Binary[Long, Long, Long](x, y, _ % _)
+    case (RuntimeType.Long, RuntimeType.Int) => Expr.Binary[Long, Int, Long](x, y, _ % _)
+    case (RuntimeType.Int, RuntimeType.Long) => Expr.Binary[Int, Long, Long](x, y, _ % _)
+    // Int
+    case (RuntimeType.Int, RuntimeType.Int) => Expr.Binary[Int, Int, Int](x, y, _ % _)
+    // Double
+    case (RuntimeType.Double, RuntimeType.Double) => Expr.Binary[Double, Double, Double](x, y, _ % _)
+    case (RuntimeType.Double, RuntimeType.Long) => Expr.Binary[Double, Long, Double](x, y, _ % _)
+    case (RuntimeType.Long, RuntimeType.Double) => Expr.Binary[Long, Double, Double](x, y, _ % _)
+    case (RuntimeType.Double, RuntimeType.Int) => Expr.Binary[Double, Int, Double](x, y, _ % _)
+    case (RuntimeType.Int, RuntimeType.Double) => Expr.Binary[Int, Double, Double](x, y, _ % _)
+    case _ => throw new InvalidExpressionException("mod", x, y)
 
-  def negate(): Expr = ArithmeticOps.Negate(this)
+  def abs: Expr = x.typeOf match
+    case RuntimeType.Long => Expr.Unary[Long, Long](x, math.abs)
+    case RuntimeType.Int => Expr.Unary[Int, Int](x, math.abs)
+    case RuntimeType.Double => Expr.Unary[Double, Double](x, math.abs)
+    case _ => throw new InvalidExpressionException("abs", x)
 
-}
-
-private[crossbow] object ArithmeticOps {
-
-  case class Plus(lhs: Expr, rhs: Expr) extends BinaryExpr(lhs, rhs) {
-    override def typeSpec(lhsOperand: Specialized[_], rhsOperand: Specialized[_]): Specialized[_] =
-      (lhsOperand.typeOf, rhsOperand.typeOf) match {
-        // Long
-        case (LongType, LongType) => specialize[Long, Long, Long](lhsOperand, rhsOperand, _ + _)
-        case (LongType, IntType) => specialize[Long, Int, Long](lhsOperand, rhsOperand, _ + _)
-        case (IntType, LongType) => specialize[Int, Long, Long](lhsOperand, rhsOperand, _ + _)
-        // Int
-        case (IntType, IntType) => specialize[Int, Int, Int](lhsOperand, rhsOperand, _ + _)
-        // Double
-        case (DoubleType, DoubleType) => specialize[Double, Double, Double](lhsOperand, rhsOperand, _ + _)
-        case (DoubleType, LongType) => specialize[Double, Long, Double](lhsOperand, rhsOperand, _ + _)
-        case (LongType, DoubleType) => specialize[Long, Double, Double](lhsOperand, rhsOperand, _ + _)
-        case (DoubleType, IntType) => specialize[Double, Int, Double](lhsOperand, rhsOperand, _ + _)
-        case (IntType, DoubleType) => specialize[Int, Double, Double](lhsOperand, rhsOperand, _ + _)
-        case _ => throw new InvalidExpressionException("Plus", lhsOperand.typeOf, rhsOperand.typeOf)
-      }
-  }
-
-  case class Minus(lhs: Expr, rhs: Expr) extends BinaryExpr(lhs, rhs) {
-    override def typeSpec(lhsOperand: Specialized[_], rhsOperand: Specialized[_]): Specialized[_] =
-      (lhsOperand.typeOf, rhsOperand.typeOf) match {
-        // Long
-        case (LongType, LongType) => specialize[Long, Long, Long](lhsOperand, rhsOperand, _ - _)
-        case (LongType, IntType) => specialize[Long, Int, Long](lhsOperand, rhsOperand, _ - _)
-        case (IntType, LongType) => specialize[Int, Long, Long](lhsOperand, rhsOperand, _ - _)
-        // Int
-        case (IntType, IntType) => specialize[Int, Int, Int](lhsOperand, rhsOperand, _ - _)
-        // Double
-        case (DoubleType, DoubleType) => specialize[Double, Double, Double](lhsOperand, rhsOperand, _ - _)
-        case (DoubleType, LongType) => specialize[Double, Long, Double](lhsOperand, rhsOperand, _ - _)
-        case (LongType, DoubleType) => specialize[Long, Double, Double](lhsOperand, rhsOperand, _ - _)
-        case (DoubleType, IntType) => specialize[Double, Int, Double](lhsOperand, rhsOperand, _ - _)
-        case (IntType, DoubleType) => specialize[Int, Double, Double](lhsOperand, rhsOperand, _ - _)
-        case _ => throw new InvalidExpressionException("Minus", lhsOperand.typeOf, rhsOperand.typeOf)
-      }
-  }
-
-  case class Multiply(lhs: Expr, rhs: Expr) extends BinaryExpr(lhs, rhs) {
-    override def typeSpec(lhsOperand: Specialized[_], rhsOperand: Specialized[_]): Specialized[_] =
-      (lhsOperand.typeOf, rhsOperand.typeOf) match {
-        // Long
-        case (LongType, LongType) => specialize[Long, Long, Long](lhsOperand, rhsOperand, _ * _)
-        case (LongType, IntType) => specialize[Long, Int, Long](lhsOperand, rhsOperand, _ * _)
-        case (IntType, LongType) => specialize[Int, Long, Long](lhsOperand, rhsOperand, _ * _)
-        // Int
-        case (IntType, IntType) => specialize[Int, Int, Int](lhsOperand, rhsOperand, _ * _)
-        // Double
-        case (DoubleType, DoubleType) => specialize[Double, Double, Double](lhsOperand, rhsOperand, _ * _)
-        case (DoubleType, LongType) => specialize[Double, Long, Double](lhsOperand, rhsOperand, _ * _)
-        case (LongType, DoubleType) => specialize[Long, Double, Double](lhsOperand, rhsOperand, _ * _)
-        case (DoubleType, IntType) => specialize[Double, Int, Double](lhsOperand, rhsOperand, _ * _)
-        case (IntType, DoubleType) => specialize[Int, Double, Double](lhsOperand, rhsOperand, _ * _)
-        case _ => throw new InvalidExpressionException("Multiply", lhsOperand.typeOf, rhsOperand.typeOf)
-      }
-  }
-
-  case class Divide(lhs: Expr, rhs: Expr) extends BinaryExpr(lhs, rhs) {
-    override def typeSpec(lhsOperand: Specialized[_], rhsOperand: Specialized[_]): Specialized[_] =
-      (lhsOperand.typeOf, rhsOperand.typeOf) match {
-        // Long
-        case (LongType, LongType) => specialize[Long, Long, Long](lhsOperand, rhsOperand, _ / _)
-        case (LongType, IntType) => specialize[Long, Int, Long](lhsOperand, rhsOperand, _ / _)
-        case (IntType, LongType) => specialize[Int, Long, Long](lhsOperand, rhsOperand, _ / _)
-        // Int
-        case (IntType, IntType) => specialize[Int, Int, Int](lhsOperand, rhsOperand, _ / _)
-        // Double
-        case (DoubleType, DoubleType) => specialize[Double, Double, Double](lhsOperand, rhsOperand, _ / _)
-        case (DoubleType, LongType) => specialize[Double, Long, Double](lhsOperand, rhsOperand, _ / _)
-        case (LongType, DoubleType) => specialize[Long, Double, Double](lhsOperand, rhsOperand, _ / _)
-        case (DoubleType, IntType) => specialize[Double, Int, Double](lhsOperand, rhsOperand, _ / _)
-        case (IntType, DoubleType) => specialize[Int, Double, Double](lhsOperand, rhsOperand, _ / _)
-        case _ => throw new InvalidExpressionException("Divide", lhsOperand.typeOf, rhsOperand.typeOf)
-      }
-  }
-
-  case class Mod(lhs: Expr, rhs: Expr) extends BinaryExpr(lhs, rhs) {
-    override def typeSpec(lhsOperand: Specialized[_], rhsOperand: Specialized[_]): Specialized[_] =
-      (lhsOperand.typeOf, rhsOperand.typeOf) match {
-        // Long
-        case (LongType, LongType) => specialize[Long, Long, Long](lhsOperand, rhsOperand, _ % _)
-        case (LongType, IntType) => specialize[Long, Int, Long](lhsOperand, rhsOperand, _ % _)
-        case (IntType, LongType) => specialize[Int, Long, Long](lhsOperand, rhsOperand, _ % _)
-        // Int
-        case (IntType, IntType) => specialize[Int, Int, Int](lhsOperand, rhsOperand, _ % _)
-        // Double
-        case (DoubleType, DoubleType) => specialize[Double, Double, Double](lhsOperand, rhsOperand, _ % _)
-        case (DoubleType, LongType) => specialize[Double, Long, Double](lhsOperand, rhsOperand, _ % _)
-        case (LongType, DoubleType) => specialize[Long, Double, Double](lhsOperand, rhsOperand, _ % _)
-        case (DoubleType, IntType) => specialize[Double, Int, Double](lhsOperand, rhsOperand, _ % _)
-        case (IntType, DoubleType) => specialize[Int, Double, Double](lhsOperand, rhsOperand, _ % _)
-        case _ => throw new InvalidExpressionException("Mod", lhsOperand.typeOf, rhsOperand.typeOf)
-      }
-  }
-
-  case class Abs(expr: Expr) extends UnaryExpr(expr) {
-    override def typeSpec(operand: Specialized[_]): Specialized[_] = operand.typeOf match {
-      case LongType => specialize[Long, Long](operand, math.abs)
-      case IntType => specialize[Int, Int](operand, math.abs)
-      case DoubleType => specialize[Double, Double](operand, math.abs)
-      case _ => throw new InvalidExpressionException("Abs", operand.typeOf)
-    }
-  }
-
-  case class Negate(expr: Expr) extends UnaryExpr(expr) {
-    override def typeSpec(operand: Specialized[_]): Specialized[_] = operand.typeOf match {
-      case LongType => specialize[Long, Long](operand, -_)
-      case IntType => specialize[Int, Int](operand, -_)
-      case DoubleType => specialize[Double, Double](operand, -_)
-      case _ => throw new InvalidExpressionException("Negate", operand.typeOf)
-    }
-  }
-
-}
+  def negate: Expr = x.typeOf match
+    case RuntimeType.Long => Expr.Unary[Long, Long](x, -_)
+    case RuntimeType.Int => Expr.Unary[Int, Int](x, -_)
+    case RuntimeType.Double => Expr.Unary[Double, Double](x, -_)
+    case _ => throw new InvalidExpressionException("negate", x)

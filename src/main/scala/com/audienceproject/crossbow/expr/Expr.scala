@@ -1,96 +1,67 @@
 package com.audienceproject.crossbow.expr
 
 import com.audienceproject.crossbow.DataFrame
-import com.audienceproject.crossbow.exceptions.InvalidExpressionException
+import com.audienceproject.crossbow.exceptions.{IncorrectTypeException, InvalidExpressionException}
 
-abstract class Expr extends BaseOps with ArithmeticOps with BooleanOps with ComparisonOps {
-  private[crossbow] def compile(context: DataFrame): Specialized[_]
-}
+sealed trait Expr extends BaseOps, ArithmeticOps, BooleanOps, ComparisonOps:
+  private[crossbow] val typeOf: RuntimeType
 
-private[crossbow] object Expr {
+  private[crossbow] def eval(i: Int): Any
 
-  case class Named(name: String, expr: Expr) extends Expr {
-    override private[crossbow] def compile(context: DataFrame) = expr.compile(context)
-  }
+  private[crossbow] def typecheckAs[T: TypeTag]: Int => T =
+    val expectedType = summon[TypeTag[T]].runtimeType
+    if expectedType.compatible(typeOf) then eval.asInstanceOf[Int => T]
+    else throw IncorrectTypeException(expectedType, typeOf)
 
-  case class Cell(columnName: String) extends Expr {
-    override private[crossbow] def compile(context: DataFrame) = {
-      val columnType = context.schema.get(columnName).columnType
-      columnType match {
-        case IntType =>
-          val columnData = context.getColumnData(columnName).asInstanceOf[Array[Int]]
-          specialize[Int](columnData)
-        case LongType =>
-          val columnData = context.getColumnData(columnName).asInstanceOf[Array[Long]]
-          specialize[Long](columnData)
-        case DoubleType =>
-          val columnData = context.getColumnData(columnName).asInstanceOf[Array[Double]]
-          specialize[Double](columnData)
-        case BooleanType =>
-          val columnData = context.getColumnData(columnName).asInstanceOf[Array[Boolean]]
-          specialize[Boolean](columnData)
-        case _ =>
-          val columnData = context.getColumnData(columnName)
-          specializeWithType[Any](columnData, columnType)
-      }
-    }
+private[crossbow] object Expr:
 
+  case class Named(name: String, expr: Expr) extends Expr:
+    override private[crossbow] val typeOf = expr.typeOf
+    override private[crossbow] def eval(i: Int) = expr.eval(i)
+
+  case class Cell(columnName: String)(using df: DataFrame) extends Expr:
+    private val columnData = summon[DataFrame].getColumnData(columnName)
+    override private[crossbow] val typeOf = summon[DataFrame].schema.get(columnName).columnType
+    override private[crossbow] def eval(i: Int) = columnData.apply(i)
     override def toString: String = columnName
-  }
 
-  case class Index() extends Expr {
-    override private[crossbow] def compile(context: DataFrame) = {
-      specialize[Int](identity)
-    }
-  }
+  case class Index()(using df: DataFrame) extends Expr:
+    override private[crossbow] val typeOf = RuntimeType.Int
+    override private[crossbow] def eval(i: Int): Int = i
 
-  case class Literal[T: ru.TypeTag](value: T) extends Expr {
-    override private[crossbow] def compile(context: DataFrame) = specialize[T](_ => value)
-  }
+  case class Literal[T: TypeTag](value: T) extends Expr:
+    override private[crossbow] val typeOf = summon[TypeTag[T]].runtimeType
+    override private[crossbow] def eval(i: Int): T = value
 
-  case class Lambda[T: ru.TypeTag, R: ru.TypeTag](expr: Expr, f: T => R) extends Expr {
-    override private[crossbow] def compile(context: DataFrame) = {
-      val eval = expr.compile(context).typecheckAs[T]
-      specialize[R](i => f(eval(i)))
-    }
+  case class Unary[T: TypeTag, R: TypeTag](expr: Expr, f: T => R) extends Expr:
+    private val exprEval = expr.typecheckAs[T]
+    override private[crossbow] val typeOf = summon[TypeTag[R]].runtimeType
+    override private[crossbow] def eval(i: Int) = f(exprEval(i))
+    private[crossbow] def copy(newExpr: Expr) = Unary(newExpr, f)
 
-    def copy(newExpr: Expr): Lambda[T, R] = Lambda(newExpr, f)
-  }
+  case class Binary[T: TypeTag, U: TypeTag, R: TypeTag](lhs: Expr, rhs: Expr, f: (T, U) => R) extends Expr:
+    private val lhsEval = lhs.typecheckAs[T]
+    private val rhsEval = rhs.typecheckAs[U]
+    override private[crossbow] val typeOf = summon[TypeTag[R]].runtimeType
+    override private[crossbow] def eval(i: Int) = f(lhsEval(i), rhsEval(i))
+    private[crossbow] def copy(newLhs: Expr, newRhs: Expr) = Binary(newLhs, newRhs, f)
 
-  case class Tuple(exprs: Expr*) extends Expr {
-    override private[crossbow] def compile(context: DataFrame) = {
-      val evals = exprs.map(_.compile(context))
-      val productType = ProductType(evals.map(_.typeOf): _*)
-      evals match {
-        case Seq(e1, e2) => specializeWithType[(_, _)](i => (e1(i), e2(i)), productType)
-        case Seq(e1, e2, e3) => specializeWithType[(_, _, _)](i => (e1(i), e2(i), e3(i)), productType)
-        case Seq(e1, e2, e3, e4) => specializeWithType[(_, _, _, _)](i => (e1(i), e2(i), e3(i), e4(i)), productType)
-        case Seq(e1, e2, e3, e4, e5) => specializeWithType[(_, _, _, _, _)](i => (e1(i), e2(i), e3(i), e4(i), e5(i)), productType)
-        case Seq(e1, e2, e3, e4, e5, e6) => specializeWithType[(_, _, _, _, _, _)](i => (e1(i), e2(i), e3(i), e4(i), e5(i), e6(i)), productType)
-      }
-    }
-  }
+  case class Aggregate[T: TypeTag, U](expr: Expr)
+    (f: (T, U) => U, val seed: U, private[crossbow] val typeOf: RuntimeType = expr.typeOf) extends Expr:
+    private val exprEval = expr.typecheckAs[T]
+    override private[crossbow] def eval(i: Int) = exprEval(i)
+    private[crossbow] def reduce(i: Int, agg: U): U = f(exprEval(i), agg)
+    private[crossbow] def copy(newExpr: Expr) = Aggregate(newExpr)(f, seed, typeOf)
 
-  case class List(exprs: Seq[Expr]) extends Expr {
-    override private[crossbow] def compile(context: DataFrame) = {
-      if (exprs.isEmpty) specialize[Seq[Nothing]](_ => Seq.empty)
-      else {
-        val evals = exprs.map(_.compile(context))
-        val types = evals.map(_.typeOf)
-        if (types.distinct.size > 1) throw new InvalidExpressionException("List", types: _*)
-        specializeWithType[Seq[_]](i => evals.map(_ (i)), ListType(types.head))
-      }
-    }
-  }
+  case class Product(exprs: Seq[Expr]) extends Expr:
+    override private[crossbow] val typeOf = RuntimeType.Product(exprs.map(_.typeOf) *)
+    override private[crossbow] def eval(i: Int): Tuple =
+      exprs.foldRight(EmptyTuple: Tuple):
+        (expr, tup) => expr.eval(i) *: tup
 
-  private def specialize[T: ru.TypeTag](op: Int => T) = new Specialized[T] {
-    override def apply(i: Int): T = op(i)
-  }
-
-  private def specializeWithType[T: ru.TypeTag](op: Int => T, specializedType: Type) = new Specialized[T] {
-    override def apply(i: Int): T = op(i)
-
-    override val typeOf: Type = specializedType
-  }
-
-}
+  case class List(exprs: Seq[Expr]) extends Expr:
+    override private[crossbow] val typeOf =
+      val types = exprs.map(_.typeOf)
+      if (types.distinct.size > 1) throw new InvalidExpressionException("List", exprs *)
+      else RuntimeType.List(types.head)
+    override private[crossbow] def eval(i: Int): Seq[Any] = exprs.map(_.eval(i))

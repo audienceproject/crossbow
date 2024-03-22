@@ -9,23 +9,22 @@ import scala.collection.mutable
 private[crossbow] object SortMergeJoin {
 
   // NOTE: 'left' and 'right' are assumed to be sorted on 'joinExpr' in advance.
-  def apply(left: DataFrame, right: DataFrame, joinExpr: Expr, joinType: JoinType,
-            ordering: Ordering[Any]): DataFrame = {
+  def apply(left: DataFrame, right: DataFrame, joinExpr: DataFrame ?=> Expr, joinType: JoinType, ordering: Ordering[Any]): DataFrame = {
 
-    val leftKey = left.select(joinExpr).as[Any]
-    val rightKey = right.select(joinExpr).as[Any]
+    val leftKey = left.select(joinExpr)
+    val rightKey = right.select(joinExpr)
 
     val (leftResult, rightResult) = resultBuffers(left, right, joinType)
 
-    def advance(start: Int, keyColumn: DataFrame#TypedView[Any]): Seq[Int] = {
-      if (start >= keyColumn.size) Seq.empty
+    def advance(start: Int, df: DataFrame): Seq[Int] = {
+      if (start >= df.rowCount) Seq.empty
       else {
-        val key = keyColumn(start)
+        val key = df(start)
 
         @tailrec
         def indexOfNextKey(i: Int): Int = {
-          if (i < keyColumn.size) {
-            val nextKey = keyColumn(i)
+          if (i < df.rowCount) {
+            val nextKey = df(i)
             if (ordering.equiv(key, nextKey)) indexOfNextKey(i + 1)
             else i
           } else i
@@ -61,16 +60,15 @@ private[crossbow] object SortMergeJoin {
       }
     }
 
-    if (leftSet.nonEmpty && isLeftJoin) addCartesianProduct(leftSet.head until leftKey.size, Seq(-1))
-    if (rightSet.nonEmpty && isRightJoin) addCartesianProduct(Seq(-1), rightSet.head until rightKey.size)
+    if (leftSet.nonEmpty && isLeftJoin) addCartesianProduct(leftSet.head until leftKey.rowCount, Seq(-1))
+    if (rightSet.nonEmpty && isRightJoin) addCartesianProduct(Seq(-1), rightSet.head until rightKey.rowCount)
 
     val leftFinal = left.slice(leftResult.toIndexedSeq)
     val rightFinal = right.slice(rightResult.toIndexedSeq)
     leftFinal.merge(rightFinal)
   }
 
-  private def resultBuffers(left: DataFrame, right: DataFrame,
-                            joinType: JoinType): (mutable.ArrayBuffer[Int], mutable.ArrayBuffer[Int]) = {
+  private def resultBuffers(left: DataFrame, right: DataFrame, joinType: JoinType): (mutable.ArrayBuffer[Int], mutable.ArrayBuffer[Int]) = {
     val defaultBufferSize = joinType match {
       case JoinType.Inner => math.min(left.rowCount, right.rowCount)
       case JoinType.FullOuter => math.max(left.rowCount, right.rowCount)
