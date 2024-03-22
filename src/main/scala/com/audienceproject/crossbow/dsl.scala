@@ -6,6 +6,8 @@ import com.audienceproject.crossbow.expr.*
 enum JoinType:
   case Inner, FullOuter, LeftOuter, RightOuter
 
+export expr.Order
+
 // Column expression.
 extension (sc: StringContext)
   def $(args: Any*): DataFrame ?=> Expr = Expr.Cell(sc.s(args *))
