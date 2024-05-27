@@ -44,6 +44,14 @@ class DataFrame private(
     select(columnNames.map(Expr.Cell.apply) *)
 
   /**
+   *
+   * @param n number of rows to be returned
+   * @return Take the first n rows of the Dataframe
+   */
+  def take(n: Int): DataFrame =
+    this.apply(Range(0, n))
+
+  /**
    * Typecast this DataFrame to a TypedView of the type parameter 'T'. All columns in this DataFrame will have to be
    * accounted for in the given type. A DataFrame with multiple columns will have its rows represented as tuples
    * of the individual types of these columns.
