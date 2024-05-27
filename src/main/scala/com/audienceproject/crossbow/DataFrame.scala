@@ -48,9 +48,8 @@ class DataFrame private(
    * @param n number of rows to be returned
    * @return Take the first n rows of the Dataframe
    */
-  def take(n: Int): DataFrame = {
+  def take(n: Int): DataFrame =
     this.apply(Range(0, n))
-  }
 
   /**
    * Typecast this DataFrame to a TypedView of the type parameter 'T'. All columns in this DataFrame will have to be
