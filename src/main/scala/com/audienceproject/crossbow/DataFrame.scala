@@ -113,6 +113,20 @@ class DataFrame private(
     slice(indices, sortKey)
 
   /**
+   * Partition a Dataframe into two DataFrames.
+   *
+   * @param expr the [[Expr]] to evaluate,
+   * @return a Tuple with the rows for which the [[Expr]] holds 'true' on the left, and 'false' on the right
+   */
+  def partition(expr: DataFrame ?=> Expr): (DataFrame, DataFrame) =
+    given DataFrame = this
+
+    val eval = expr.typecheckAs[Boolean]
+    val allIndices = 0 until rowCount
+    val selectedRows = for (i <- 0 until rowCount if eval(i)) yield i
+
+    (slice(selectedRows, sortKey), slice((allIndices.toSet -- selectedRows.toSet).toIndexedSeq, sortKey))
+  /**
    * Explode this DataFrame on the given expression, flattening its contents and repeating all other cells on the
    * row for every element in the sequence. The given [[Expr]] must evaluate to a list type.
    * Use the 'as' method on [[Expr]] to name the flattened column.
