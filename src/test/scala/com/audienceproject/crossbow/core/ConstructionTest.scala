@@ -4,7 +4,7 @@ import com.audienceproject.crossbow.*
 import com.audienceproject.crossbow.schema.{Column, Schema}
 import org.scalatest.funsuite.AnyFunSuite
 
-class ConstuctionTest extends AnyFunSuite:
+class ConstructionTest extends AnyFunSuite:
 
   test("Construct from typed empty Seq"):
     val df = DataFrame.fromSeq(Seq.empty[(Int, Long)])
