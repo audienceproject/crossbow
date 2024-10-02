@@ -22,6 +22,7 @@ def lit[T: TypeTag](value: T): Expr = Expr.Literal(value)
 
 given Conversion[Int, Expr] = lit[Int](_)
 given Conversion[Long, Expr] = lit[Long](_)
+given Conversion[Float, Expr] = lit[Float](_)
 given Conversion[Double, Expr] = lit[Double](_)
 given Conversion[Boolean, Expr] = lit[Boolean](_)
 given Conversion[String, Expr] = lit[String](_)
@@ -48,6 +49,7 @@ def seq(exprs: Expr*): Expr = Expr.List(exprs)
 def sum(expr: Expr): Expr = expr.typeOf match
   case RuntimeType.Int => Expr.Aggregate[Int, Int](expr)(_ + _, 0)
   case RuntimeType.Long => Expr.Aggregate[Long, Long](expr)(_ + _, 0L)
+  case RuntimeType.Float => Expr.Aggregate[Float, Float](expr)(_ + _, 0f)
   case RuntimeType.Double => Expr.Aggregate[Double, Double](expr)(_ + _, 0d)
   case _ => throw new AggregationException(expr)
 

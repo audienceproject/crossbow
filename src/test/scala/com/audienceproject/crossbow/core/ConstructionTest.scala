@@ -20,3 +20,8 @@ class ConstructionTest extends AnyFunSuite:
     val df = Seq.empty[(Int, Long)].toDataFrame("a", "b")
     assertResult(2)(df.numColumns)
     assertResult(Schema(Seq(Column[Int]("a"), Column[Long]("b"))))(df.schema)
+
+  test("Construct with floats"):
+    val df = Seq.empty[(Int, Float)].toDataFrame("a", "b")
+    assertResult(2)(df.numColumns)
+    assertResult(Schema(Seq(Column[Int]("a"), Column[Float]("b"))))(df.schema)

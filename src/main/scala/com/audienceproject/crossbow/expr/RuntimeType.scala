@@ -1,7 +1,7 @@
 package com.audienceproject.crossbow.expr
 
 enum RuntimeType:
-  case Int, Long, Double, Boolean, String
+  case Int, Long, Double, Boolean, String, Float
   case Product(elementTypes: RuntimeType*)
   case List(elementType: RuntimeType)
   case Generic(typeName: String)
@@ -19,6 +19,7 @@ enum RuntimeType:
     case Double => "double"
     case Boolean => "boolean"
     case String => "string"
+    case Float => "float"
     case Product(elementTypes*) => s"(${elementTypes.mkString(",")})"
     case List(elementType) => s"List($elementType)"
     case Generic(typeName) => typeName

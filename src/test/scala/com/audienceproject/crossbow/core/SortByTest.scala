@@ -9,8 +9,13 @@ class SortByTest extends AnyFunSuite:
 
   private val df = DataFrame.fromSeq(Seq(("a", 1), ("b", 2), ("c", 3), ("d", 4))).renameColumns("k", "v")
 
-  test("sortBy on single column with implicit ordering"):
+  test("sortBy on single Double column with implicit ordering"):
     val result = df.sortBy(1.0 / $"v").select($"k").as[String].toSeq
+    val expected = Seq("d", "c", "b", "a")
+    assert(result == expected)
+
+  test("sortBy on single Float column with implicit ordering"):
+    val result = df.sortBy(1.0f / $"v").select($"k").as[String].toSeq
     val expected = Seq("d", "c", "b", "a")
     assert(result == expected)
 
