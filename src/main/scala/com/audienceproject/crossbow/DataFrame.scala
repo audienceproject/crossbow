@@ -49,7 +49,7 @@ class DataFrame private(
    * @return Take the first n rows of the Dataframe
    */
   def take(n: Int): DataFrame =
-    this.apply(Range(0, n))
+    this (0 until n)
 
   /**
    * Typecast this DataFrame to a TypedView of the type parameter 'T'. All columns in this DataFrame will have to be
@@ -123,17 +123,16 @@ class DataFrame private(
   /**
    * Partition a Dataframe into two DataFrames.
    *
-   * @param expr the [[Expr]] to evaluate,
+   * @param expr the [[Expr]] to evaluate
    * @return a Tuple with the rows for which the [[Expr]] holds 'true' on the left, and 'false' on the right
    */
   def partition(expr: DataFrame ?=> Expr): (DataFrame, DataFrame) =
     given DataFrame = this
-
     val eval = expr.typecheckAs[Boolean]
     val allIndices = 0 until rowCount
-    val selectedRows = for (i <- 0 until rowCount if eval(i)) yield i
+    val (left, right) = (0 until rowCount).partition(eval)
+    (slice(left, sortKey), slice(right, sortKey))
 
-    (slice(selectedRows, sortKey), slice((allIndices.toSet -- selectedRows.toSet).toIndexedSeq, sortKey))
   /**
    * Explode this DataFrame on the given expression, flattening its contents and repeating all other cells on the
    * row for every element in the sequence. The given [[Expr]] must evaluate to a list type.
