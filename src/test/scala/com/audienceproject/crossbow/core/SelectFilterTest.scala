@@ -37,3 +37,9 @@ class SelectFilterTest extends AnyFunSuite:
     val result = df.filter($"x" * $"y" < 2).select($"k").as[String].toSeq
     val expected = Seq("a", "b")
     assert(result == expected)
+
+  test("Filter floats"):
+    val df = Seq("a" -> 0.5f, "b" -> 1.0f, "c" -> 1.5f, "d" -> 2.0f).toDataFrame("k", "x")
+    val result = df.filter($"x" < 1.1f).select($"k").as[String].toSeq
+    val expected = Seq("a", "b")
+    assert(result == expected)

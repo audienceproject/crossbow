@@ -11,6 +11,7 @@ enum Order:
       case RuntimeType.Int => Ordering.Int
       case RuntimeType.Long => Ordering.Long
       case RuntimeType.Double => Ordering.Double.TotalOrdering
+      case RuntimeType.Float => Ordering.Float.TotalOrdering
       case RuntimeType.Boolean => Ordering.Boolean
       case RuntimeType.String => Ordering.String
       case RuntimeType.Product(elementTypes*) =>

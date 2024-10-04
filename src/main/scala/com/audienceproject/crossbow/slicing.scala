@@ -9,6 +9,7 @@ private def sliceColumn(eval: Int => ?, ofType: RuntimeType, indices: IndexedSeq
     case RuntimeType.Int => fillArray[Int](indices, eval.asInstanceOf[Int => Int])
     case RuntimeType.Long => fillArray[Long](indices, eval.asInstanceOf[Int => Long])
     case RuntimeType.Double => fillArray[Double](indices, eval.asInstanceOf[Int => Double])
+    case RuntimeType.Float => fillArray[Float](indices, eval.asInstanceOf[Int => Float])
     case RuntimeType.Boolean => fillArray[Boolean](indices, eval.asInstanceOf[Int => Boolean])
     case _ => fillArray[Any](indices, eval)
 
@@ -17,6 +18,7 @@ private def padColumn(data: Array[?], ofType: RuntimeType, padding: Int): Array[
     case RuntimeType.Int => fillArray[Int](data.indices, data.asInstanceOf[Array[Int]], padding)
     case RuntimeType.Long => fillArray[Long](data.indices, data.asInstanceOf[Array[Long]], padding)
     case RuntimeType.Double => fillArray[Double](data.indices, data.asInstanceOf[Array[Double]], padding)
+    case RuntimeType.Float => fillArray[Float](data.indices, data.asInstanceOf[Array[Float]], padding)
     case RuntimeType.Boolean => fillArray[Boolean](data.indices, data.asInstanceOf[Array[Boolean]], padding)
     case _ => fillArray[Any](data.indices, data.asInstanceOf[Array[Any]], padding)
 
@@ -31,6 +33,7 @@ private def spliceColumns(data: Seq[Array[?]], ofType: RuntimeType): Array[?] =
     case RuntimeType.Int => fillNArray[Int](data.map(_.asInstanceOf[Array[Int]]))
     case RuntimeType.Long => fillNArray[Long](data.map(_.asInstanceOf[Array[Long]]))
     case RuntimeType.Double => fillNArray[Double](data.map(_.asInstanceOf[Array[Double]]))
+    case RuntimeType.Float => fillNArray[Float](data.map(_.asInstanceOf[Array[Float]]))
     case RuntimeType.Boolean => fillNArray[Boolean](data.map(_.asInstanceOf[Array[Boolean]]))
     case _ => fillNArray[Any](data.map(_.asInstanceOf[Array[Any]]))
 
@@ -47,6 +50,7 @@ private def repeatColumn(data: Array[?], ofType: RuntimeType, reps: Array[Int]):
     case RuntimeType.Int => fillRepeatArray[Int](data.asInstanceOf[Array[Int]], reps)
     case RuntimeType.Long => fillRepeatArray[Long](data.asInstanceOf[Array[Long]], reps)
     case RuntimeType.Double => fillRepeatArray[Double](data.asInstanceOf[Array[Double]], reps)
+    case RuntimeType.Float => fillRepeatArray[Float](data.asInstanceOf[Array[Float]], reps)
     case RuntimeType.Boolean => fillRepeatArray[Boolean](data.asInstanceOf[Array[Boolean]], reps)
     case _ => fillRepeatArray[Any](data.asInstanceOf[Array[Any]], reps)
 
@@ -64,5 +68,6 @@ private def convert(data: Seq[Any], dataType: RuntimeType): Array[?] =
     case RuntimeType.Int => data.asInstanceOf[Seq[Int]].toArray
     case RuntimeType.Long => data.asInstanceOf[Seq[Long]].toArray
     case RuntimeType.Double => data.asInstanceOf[Seq[Double]].toArray
+    case RuntimeType.Float => data.asInstanceOf[Seq[Float]].toArray
     case RuntimeType.Boolean => data.asInstanceOf[Seq[Boolean]].toArray
     case _ => data.toArray

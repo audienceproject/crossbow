@@ -17,6 +17,7 @@ object TypeTag:
       case '[Int] => '{ RuntimeType.Int }
       case '[Long] => '{ RuntimeType.Long }
       case '[Double] => '{ RuntimeType.Double }
+      case '[Float] => '{ RuntimeType.Float }
       case '[Boolean] => '{ RuntimeType.Boolean }
       case '[String] => '{ RuntimeType.String }
       case '[head *: tail] => '{ RuntimeType.Product(${ Expr.ofList(tupleToList[head *: tail]) } *) }
