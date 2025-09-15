@@ -26,13 +26,13 @@ class DataFrame private(
       (data, tup) => data(index) *: tup
 
   /**
-   * Retrieve a subset of rows from this DataFrame based on range of indices.
+   * Retrieve a subset of rows from this DataFrame based on indices.
    *
-   * @param range range of row indices to retrieve
+   * @param indices row indices to retrieve
    * @return new DataFrame
    */
-  def apply(range: Range): DataFrame =
-    slice(range, sortKey)
+  def apply(indices: IndexedSeq[Int]): DataFrame =
+    slice(indices, sortKey)
 
   /**
    * Select a subset of columns from this DataFrame.
@@ -289,12 +289,12 @@ class DataFrame private(
     def apply(index: Int): T = DataFrame.this.apply(index).asInstanceOf[T]
 
     /**
-     * Retrieve a subset of rows from this view based on range of indices.
+     * Retrieve a subset of rows from this view based on row indices.
      *
-     * @param range range of row indices to retrieve
+     * @param indices row indices to retrieve
      * @return sequence of rows of type 'T'
      */
-    def apply(range: Range): Seq[T] = for (i <- range) yield this (i)
+    def apply(indices: IndexedSeq[Int]): Seq[T] = for (i <- indices) yield this (i)
 
     override def iterator: Iterator[T] = this (0 until rowCount).iterator
 
