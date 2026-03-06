@@ -368,4 +368,62 @@ object DataFrame:
         spliceColumns(combinedData, schema.columns(i).columnType)
       DataFrame(colData.toVector, schema)
 
+  /**
+   * Returns an empty builder.
+   */
+  def builder(): Builder = EmptyBuilder
+
+  /**
+   * A builder for constructing a DataFrame by adding columns one at a time with specified data and types. Using
+   * `withColumn` variants without the type tag avoids auto-boxing of simple numeric types.
+   */
+  trait Builder:
+    protected def withColumnAny(columnType: RuntimeType, name: String, column: Array[?]): Builder
+    /**
+     * Return a DataFrame with all the columns that have been added so far.
+     */
+    def toDataFrame: DataFrame
+    /**
+     * Add a `Long` column with the given name and row data.
+     */
+    def withColumn(name: String, column: Array[Long]): Builder = withColumnAny(RuntimeType.Long, name, column)
+    /**
+     * Add an `Int` column with the given name and row data.
+     */
+    def withColumn(name: String, column: Array[Int]): Builder = withColumnAny(RuntimeType.Int, name, column)
+    /**
+     * Add a `Double` column with the given name and row data.
+     */
+    def withColumn(name: String, column: Array[Double]): Builder = withColumnAny(RuntimeType.Double, name, column)
+    /**
+     * Add a `Float` column with the given name and row data.
+     */
+    def withColumn(name: String, column: Array[Float]): Builder = withColumnAny(RuntimeType.Float, name, column)
+    /**
+     * Add a `Boolean` column with the given name and row data.
+     */
+    def withColumn(name: String, column: Array[Boolean]): Builder = withColumnAny(RuntimeType.Boolean, name, column)
+    /**
+     * Add a column with the given name and row data.
+     */
+    def withColumn[T: TypeTag](name: String, columnData: Array[T]): Builder =
+      val columnType = summon[TypeTag[T]].runtimeType
+      withColumnAny(columnType, name, columnData)
+  end Builder
+
+  private object EmptyBuilder extends Builder:
+    override def toDataFrame: DataFrame = DataFrame.empty
+    protected def withColumnAny(columnType: RuntimeType, name: String, column: Array[?]): Builder =
+      val columnSchema = Column(name, columnType)
+      NonEmptyBuilder(DataFrame(Vector(column), Schema(Seq(columnSchema))))
+  end EmptyBuilder
+
+  private class NonEmptyBuilder(dataFrame: DataFrame) extends Builder:
+    def toDataFrame: DataFrame = dataFrame
+    protected def withColumnAny(columnType: RuntimeType, name: String, column: Array[?]): Builder =
+      if (column.length != dataFrame.rowCount)
+        throw IllegalArgumentException(s"Column '$name' must contain ${dataFrame.rowCount} rows. Was ${column.length}.")
+      val columnSchema = Column(name, columnType)
+      NonEmptyBuilder(DataFrame(dataFrame.columnData :+ column, dataFrame.schema.add(columnSchema)))
+  end NonEmptyBuilder
 end DataFrame
