@@ -121,6 +121,17 @@ class DataFrame private(
     slice(indices, sortKey)
 
   /**
+   * Apply a function to each row of this DataFrame.
+   *
+   * @param f the function to apply
+   */
+  def foreach(f: Row => Unit): Unit =
+    var i = 0
+    while i < rowCount do
+      f(Row(i))
+      i = i + 1
+
+  /**
    * Partition a Dataframe into two DataFrames.
    *
    * @param expr the [[Expr]] to evaluate
@@ -262,6 +273,10 @@ class DataFrame private(
   private[crossbow] def getColumnData(columnName: String): Array[?] =
     val columnIndex = schema.indexOf(columnName)
     columnData(columnIndex)
+
+  class Row(index: Int):
+    def apply[T](i: Int): T = columnData(i)(index).asInstanceOf
+    def apply[T](columnName: String): T = this (schema.indexOf(columnName))
 
   class GroupedView private[DataFrame](keyExprs: Seq[DataFrame ?=> Expr]):
     /**
