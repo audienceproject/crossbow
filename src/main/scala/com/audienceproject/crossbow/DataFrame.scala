@@ -1,10 +1,11 @@
 package com.audienceproject.crossbow
 
 import com.audienceproject.crossbow.algorithms.{GroupBy, SortMergeJoin}
-import com.audienceproject.crossbow.exceptions.JoinException
+import com.audienceproject.crossbow.exceptions.{IncorrectTypeException, JoinException}
 import com.audienceproject.crossbow.expr.*
 import com.audienceproject.crossbow.schema.{Column, Schema}
 
+import scala.compiletime.erasedValue
 import scala.util.Sorting
 
 class DataFrame private(
@@ -125,11 +126,44 @@ class DataFrame private(
    *
    * @param f the function to apply
    */
-  def foreach(f: Row => Unit): Unit =
+  def foreach(f: Int => Unit): Unit =
     var i = 0
     while i < rowCount do
-      f(Row(i))
+      f(i)
       i = i + 1
+
+  /**
+   * Retrieve a typed accessor for the given column, for reading cells of the [[Row]]s passed to [[foreach]].
+   * For the primitive types `Int`, `Long`, `Double`, `Float` and `Boolean` the accessor reads the underlying column
+   * without boxing.
+   *
+   * @param columnName name of the column
+   * @tparam T the type of the column
+   * @throws IncorrectTypeException if the column is not of type 'T'
+   * @return accessor reading the value of the column from a [[Row]]
+   */
+  transparent inline def column[T: TypeTag](columnName: String) =
+    inline erasedValue[T] match
+      case _: Int => intColumn(columnName)
+      case _: Long => longColumn(columnName)
+      case _: Double => doubleColumn(columnName)
+      case _: Float => floatColumn(columnName)
+      case _: Boolean => booleanColumn(columnName)
+      case _ => objectColumn[T](columnName, summon[TypeTag[T]].runtimeType)
+
+  // Factories for the accessors returned by `column`, which cannot call the private constructors itself.
+  private[crossbow] def intColumn(columnName: String): IntColumn =
+    IntColumn(typedColumnData(columnName, RuntimeType.Int))
+  private[crossbow] def longColumn(columnName: String): LongColumn =
+    LongColumn(typedColumnData(columnName, RuntimeType.Long))
+  private[crossbow] def doubleColumn(columnName: String): DoubleColumn =
+    DoubleColumn(typedColumnData(columnName, RuntimeType.Double))
+  private[crossbow] def floatColumn(columnName: String): FloatColumn =
+    FloatColumn(typedColumnData(columnName, RuntimeType.Float))
+  private[crossbow] def booleanColumn(columnName: String): BooleanColumn =
+    BooleanColumn(typedColumnData(columnName, RuntimeType.Boolean))
+  private[crossbow] def objectColumn[T](columnName: String, expectedType: RuntimeType): ObjectColumn[T] =
+    ObjectColumn(typedColumnData(columnName, expectedType))
 
   /**
    * Partition a Dataframe into two DataFrames.
@@ -274,9 +308,30 @@ class DataFrame private(
     val columnIndex = schema.indexOf(columnName)
     columnData(columnIndex)
 
-  class Row(index: Int):
-    def apply[T](i: Int): T = columnData(i)(index).asInstanceOf
-    def apply[T](columnName: String): T = this (schema.indexOf(columnName))
+  private def typedColumnData[T](columnName: String, expectedType: RuntimeType): Array[T] =
+    val actualType = schema.get(columnName).columnType
+    if expectedType.compatible(actualType) then getColumnData(columnName).asInstanceOf[Array[T]]
+    else throw IncorrectTypeException(expectedType, actualType)
+
+  // Accessors deliberately do not extend Function1: Scala 3 does not specialize subclasses of Function1, so calls
+  // through the function type would box. Called directly, reading a primitive cell is a plain array load.
+  final class IntColumn private[crossbow](data: Array[Int]):
+    inline def apply(index: Int): Int = data(index)
+
+  final class LongColumn private[crossbow](data: Array[Long]):
+    inline def apply(index: Int): Long = data(index)
+
+  final class DoubleColumn private[crossbow](data: Array[Double]):
+    inline def apply(index: Int): Double = data(index)
+
+  final class FloatColumn private[crossbow](data: Array[Float]):
+    inline def apply(index: Int): Float = data(index)
+
+  final class BooleanColumn private[crossbow](data: Array[Boolean]):
+    inline def apply(index: Int): Boolean = data(index)
+
+  final class ObjectColumn[T] private[crossbow](data: Array[AnyRef]):
+    inline def apply(index: Int): T = data(index).asInstanceOf[T]
 
   class GroupedView private[DataFrame](keyExprs: Seq[DataFrame ?=> Expr]):
     /**
