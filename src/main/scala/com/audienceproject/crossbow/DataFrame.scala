@@ -133,14 +133,14 @@ class DataFrame private(
       i = i + 1
 
   /**
-   * Retrieve a typed accessor for the given column, for reading cells of the [[Row]]s passed to [[foreach]].
+   * Retrieve a typed accessor for the given column, for reading cells by index.
    * For the primitive types `Int`, `Long`, `Double`, `Float` and `Boolean` the accessor reads the underlying column
    * without boxing.
    *
    * @param columnName name of the column
    * @tparam T the type of the column
    * @throws IncorrectTypeException if the column is not of type 'T'
-   * @return accessor reading the value of the column from a [[Row]]
+   * @return accessor reading the value of the column from an index
    */
   transparent inline def column[T: TypeTag](columnName: String) =
     inline erasedValue[T] match
